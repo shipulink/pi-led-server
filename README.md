@@ -1,2 +1,2 @@
 # pi-led-server
-A Rest API controller for individually-addressable LED strips
+A Rest API LED strip (NeoPixel) controller for Raspberry Pi Zero
