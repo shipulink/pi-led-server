@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import ctypes
+import os
+import mmap
 
 HIGH_WAITS_0 = 1
 HIGH_WAITS_1 = 1
