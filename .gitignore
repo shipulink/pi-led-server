@@ -1,3 +1,4 @@
 .git
+.vscode
 app/*.o
 app/*.so
