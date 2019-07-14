@@ -186,7 +186,7 @@ dma_mem = mmap.mmap(file, 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRIT
 
 # Write CB_ADDR to register 2 of dma_mem (Channel 0 of DMA)
 cb_addr_bytes = CB_ADDR.to_bytes(4, byteorder='big')
-dma_mem[4:7] = cb_addr_bytes
+dma_mem[4:8] = cb_addr_bytes
 
 # Set the active bit of DMA Channel 0
 dma_mem[3] = 0x1
