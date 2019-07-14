@@ -180,7 +180,9 @@ CB_ADDR = ctypes.addressof(cb_mem)
 # Thus the offset is 0x7000 from the start of /dev/mem file
 dma_offset = 0x7000
 file = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
-dma_mem = mmap.mmap(file, 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, dma_offset)
+
+# TODO: This is missing the "Access" param. how do I not specify it?
+dma_mem = mmap.mmap(file, 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset = dma_offset)
 
 # Write CB_ADDR to register 2 of dma_mem (Channel 0 of DMA)
 cb_addr_bytes = CB_ADDR.to_bytes(4, byteorder='big')
