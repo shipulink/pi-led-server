@@ -143,8 +143,8 @@ cb_word_0 = write_bits_to_word(cb_word_0, INTEN, 0, 0)
 cb_word_1 = write_bits_to_word(None, data_addr, 31, 0)
 
 # CB Word 2:
-gpio_bus_addr = 0x7E20001C
-cb_word_2 = write_bits_to_word(None, gpio_bus_addr, 31, 0)
+gpio_phys_addr = 0x2020001C
+cb_word_2 = write_bits_to_word(None, gpio_phys_addr, 31, 0)
 
 # CB Word 3:
 txfr_len = 2048 # later on, this should be automatically calculated based on how many LEDs we want to send data for
