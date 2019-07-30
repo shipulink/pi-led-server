@@ -33,7 +33,7 @@ def ctypes_alloc_aligned(size, alignment):
     # Account for a potential shift of up to (alignment-1)
     buf_size = size + alignment - 1
     # Allocate the memory as a Python byte array
-    raw_memory = bytearray(buf_size)
+    raw_memory = bytearray(buf_size + 1)
 
     # c_char is exactly one byte. In Python, multiplying a type T by N creates a new type that is an Array of N Ts.
     ctypes_raw_type = ctypes.c_char * buf_size
@@ -43,20 +43,20 @@ def ctypes_alloc_aligned(size, alignment):
     raw_address = ctypes.addressof(ctypes_raw_memory)
     offset = alignment - raw_address % alignment
 
-    ctypes_aligned_type = ctypes.c_char * (buf_size - offset)
+    ctypes_aligned_type = ctypes.c_char * size
     ctypes_aligned_memory = ctypes_aligned_type.from_buffer(raw_memory, offset)
 
     return ctypes_aligned_memory
 
 
-thing = ctypes_alloc_aligned(16, 32)
-thing[0:15] = b"Helloooo world!"
-v_addr = ctypes.addressof(thing)
-p_addr = virtual_to_physical_addr(v_addr)
-print(p_addr.frame_start)
-print(p_addr.offset)
-
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=p_addr.frame_start) as m:
-        s = p_addr.offset
-        print(m[s:s + 15].decode("utf-8"))
+# thing = ctypes_alloc_aligned(16, 32)
+# thing[0:15] = b"Helloooo world!"
+# v_addr = ctypes.addressof(thing)
+# p_addr = virtual_to_physical_addr(v_addr)
+# print(p_addr.frame_start)
+# print(p_addr.offset)
+#
+# with open("/dev/mem", "r+b", buffering=0) as f:
+#     with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=p_addr.frame_start) as m:
+#         s = p_addr.offset
+#         print(m[s:s + 15].decode("utf-8"))
