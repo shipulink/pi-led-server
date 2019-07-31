@@ -19,10 +19,11 @@ data_len = 16
 ## Build source data ##
 #######################
 src_mem = mu.ctypes_alloc_aligned(data_len, 32)
-write_word_to_byte_array(src_mem, 0x0, 0xffffffff)
-write_word_to_byte_array(src_mem, 0x4, 0xffffffff)
-write_word_to_byte_array(src_mem, 0x8, 0xffffffff)
-write_word_to_byte_array(src_mem, 0xC, 0xffffffff)
+src_mem[0:data_len] = b"Greetings world!"
+# write_word_to_byte_array(src_mem, 0x0, 0xffffffff)
+# write_word_to_byte_array(src_mem, 0x4, 0xffffffff)
+# write_word_to_byte_array(src_mem, 0x8, 0xffffffff)
+# write_word_to_byte_array(src_mem, 0xC, 0xffffffff)
 
 src_addr_virtual = ctypes.addressof(src_mem)
 src_addr_info = mu.virtual_to_physical_addr(src_addr_virtual)
@@ -78,4 +79,5 @@ with open("/dev/mem", "r+b", buffering=0) as f:
     with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
                    offset=dest_addr_info.frame_start) as m:
         s = dest_addr_info.offset
-        print(':'.join(format(x, '08b') for x in m[s:s + data_len][::-1]))
+        print(m[s:s+data_len].decode('utf8'))
+        print(':'.join(format(x, '08b') for x in m[s:s + data_len]))
