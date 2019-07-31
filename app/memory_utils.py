@@ -30,7 +30,7 @@ def virtual_to_physical_addr(virtual_addr):
         else:
             raise Exception("Could not get physical memory address for virtual address {}".format(hex(virtual_addr)))
 
-
+# size and alignment are in bytes
 def ctypes_alloc_aligned(size, alignment):
     # Account for a potential shift of up to (alignment-1)
     buf_size = size + alignment - 1
