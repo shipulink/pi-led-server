@@ -6,9 +6,6 @@ import mmap
 
 import app.memory_utils as mu
 
-HIGH_WAITS_0 = 1
-HIGH_WAITS_1 = 1
-LOW_WAITS = 1
 
 def write_word_to_byte_array(byte_array, address, word):
     byte_array[address: address + 4] = word.to_bytes(4, byteorder='little')
@@ -42,8 +39,9 @@ def print_dma_enabled_state(dma_memory):
 data_len = 64  # bytes
 data_mem = mu.ctypes_alloc_aligned(data_len, 32)
 write_word_to_byte_array(data_mem, 0x4, 0b001 << 24)  # set pin 18 mode to output
-write_word_to_byte_array(data_mem, 0x1C, 0b1 << 18)  # set pin 18
+# write_word_to_byte_array(data_mem, 0x1C, 0b1 << 18)  # set pin 18
 # write_word_to_byte_array(data_mem, 0x28, 0b1 << 18) # clear pin 18
+
 data_addr_virtual = ctypes.addressof(data_mem)
 data_addr = mu.virtual_to_physical_addr(data_addr_virtual).p_addr
 
@@ -72,9 +70,9 @@ write_word_to_byte_array(cb_mem, 0x0, SRC_INC | DEST_INC)
 # CB Word 1 (SRC_ADDR):
 write_word_to_byte_array(cb_mem, 0x4, data_addr)
 
-# CB Word 2 (DEST_ADDR):
-gpio_phys_addr = 0x20200000
-write_word_to_byte_array(cb_mem, 0x8, gpio_phys_addr)
+# CB Word 2 (DEST_ADDR) - physical GPIO memory address:
+gpio_addr = 0x20200000
+write_word_to_byte_array(cb_mem, 0x8, gpio_addr)
 
 # CB Word 3 (TXFR_LEN):
 txfr_len = data_len
@@ -90,18 +88,27 @@ write_word_to_byte_array(cb_mem, 0xC, txfr_len)
 ## Write to DMA ##
 ##################
 
-# Open /dev/mem (peripheral memory) as file and get a pointer to its address in the program's virtual address space:
-# We provide an offset, so that we're mapped directly to DMA memory
-
-
 PERIPHERAL_BASE = 0x20000000  # Physical
 DMA_OFFSET = 0x7000
 DMA_BASE = PERIPHERAL_BASE + DMA_OFFSET
 
+GPIO_OFFSET = 0x200000
+GPIO_BASE = PERIPHERAL_BASE + GPIO_OFFSET
+
 with open("/dev/mem", "r+b", buffering=0) as f:
     with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DMA_BASE) as dma_mem:
         # print_dma_enabled_state(dma_mem)
+        write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
+        print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
+        # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 29)
+        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
+        # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
+        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
         write_word_to_byte_array(dma_mem, 0x4, cb_addr)
         time.sleep(.5)
         write_word_to_byte_array(dma_mem, 0x0, 0b1)
         time.sleep(.5)
+
+with open("/dev/mem", "r+b", buffering=0) as f:
+    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DMA_BASE) as gpio_mem:
+        print(':'.join(format(x, '08b') for x in gpio_mem[4:8][::-1]))
