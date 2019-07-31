@@ -1,8 +1,6 @@
 import ctypes
 import unittest
-
 import mmap
-
 import app.memory_utils as mu
 
 
