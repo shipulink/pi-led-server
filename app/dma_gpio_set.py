@@ -39,11 +39,13 @@ def print_dma_enabled_state(dma_memory):
 data_len = 64  # bytes
 data_mem = mu.ctypes_alloc_aligned(data_len, 32)
 write_word_to_byte_array(data_mem, 0x4, 0b001 << 24)  # set pin 18 mode to output
+# write_word_to_byte_array(data_mem, 0x4, 0b000 << 24)  # set pin 18 mode to output
 # write_word_to_byte_array(data_mem, 0x1C, 0b1 << 18)  # set pin 18
 # write_word_to_byte_array(data_mem, 0x28, 0b1 << 18) # clear pin 18
 
 data_addr_virtual = ctypes.addressof(data_mem)
-data_addr = mu.virtual_to_physical_addr(data_addr_virtual).p_addr
+data_addr_info = mu.virtual_to_physical_addr(data_addr_virtual)
+data_addr = data_addr_info.p_addr
 
 ##################################
 ## Build DMA Control Block (CB) ##
@@ -98,8 +100,9 @@ GPIO_BASE = PERIPHERAL_BASE + GPIO_OFFSET
 with open("/dev/mem", "r+b", buffering=0) as f:
     with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DMA_BASE) as dma_mem:
         # print_dma_enabled_state(dma_mem)
+        print_dma_debug_info(dma_mem)
         write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
-        print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
+        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
         # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 29)
         # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
         # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
@@ -110,5 +113,10 @@ with open("/dev/mem", "r+b", buffering=0) as f:
         time.sleep(.5)
 
 with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DMA_BASE) as gpio_mem:
+    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=GPIO_BASE) as gpio_mem:
         print(':'.join(format(x, '08b') for x in gpio_mem[4:8][::-1]))
+
+with open("/dev/mem", "r+b", buffering=0) as f:
+    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=data_addr_info.frame_start) as m:
+        s = data_addr_info.offset
+        print(':'.join(format(x, '08b') for x in m[s:s+int(data_len/8)][::-1]))
