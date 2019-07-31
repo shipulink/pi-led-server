@@ -1,7 +1,8 @@
+import array
+import ctypes
+
 import mmap
 import os
-import ctypes
-import array
 
 # Open /dev/gpiomem as file and get a pointer to its
 # address in the program's virtual address space

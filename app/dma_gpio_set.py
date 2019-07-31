@@ -41,10 +41,11 @@ def print_dma_enabled_state(dma_memory):
 
 data_len = 64  # bytes
 data_mem = mu.ctypes_alloc_aligned(data_len, 32)
-# write_word_to_byte_array(data_mem, 0x4, 0b001 << 24)  # set pin 18
+write_word_to_byte_array(data_mem, 0x4, 0b001 << 24)  # set pin 18 mode to output
 write_word_to_byte_array(data_mem, 0x1C, 0b1 << 18)  # set pin 18
 # write_word_to_byte_array(data_mem, 0x28, 0b1 << 18) # clear pin 18
-data_addr = ctypes.addressof(data_mem)
+data_addr_virtual = ctypes.addressof(data_mem)
+data_addr = mu.virtual_to_physical_addr(data_addr_virtual).p_addr
 
 ##################################
 ## Build DMA Control Block (CB) ##
@@ -53,7 +54,8 @@ data_addr = ctypes.addressof(data_mem)
 # CB is 32 bytes long (8 words), though only 24 bytes (6 words) are used
 # CB address must be 256-bit (32-byte) aligned
 cb_mem = mu.ctypes_alloc_aligned(32, 32)
-cb_addr = ctypes.addressof(cb_mem)
+cb_addr_virtual = ctypes.addressof(cb_mem)
+cb_addr = mu.virtual_to_physical_addr(cb_addr_virtual).p_addr
 
 # Define all the fields of the CB.
 
