@@ -1,122 +1,64 @@
 #!/usr/bin/env python3
 import ctypes
-import time
 
 import mmap
 
 import app.memory_utils as mu
 
+LITTLE_ENDIAN = "little"
+BIG_ENDIAN = "big"
 
-def write_word_to_byte_array(byte_array, address, word):
-    byte_array[address: address + 4] = word.to_bytes(4, byteorder='little')
+PERIPHERAL_BASE_PHYS = 0x20000000
+PERIPHERAL_BASE_BUS = 0x7E000000
+
+DMA_OFFSET = 0x7000
+DMA_BASE = PERIPHERAL_BASE_PHYS + DMA_OFFSET
+
+GPIO_OFFSET = 0x200000
+GPIO_BASE_PHYS = PERIPHERAL_BASE_PHYS + GPIO_OFFSET
+GPIO_BASE_BUS = PERIPHERAL_BASE_BUS + GPIO_OFFSET
+
+SRC_INC = 1 << 8
+DEST_INC = 1 << 4
+
+
+def write_word_to_byte_array(byte_array, address, word, endianness):
+    byte_array[address: address + 4] = word.to_bytes(4, byteorder=endianness)
     return
 
 
-def print_dma_debug_info(dma_memory):
-    debug_register_offset = 0x20
-    i = 0
-    while i < 15:
-        start = i * 0x100 + debug_register_offset
-        arr = dma_memory[start: start + 4]
-        rev = arr[::-1]
-        print('CH' + str(i) + ':\t' + ':'.join(format(x, '08b') for x in rev))
-        i += 1
-    return
+data_len = 4  # bytes
 
+src_mem = mu.ctypes_alloc_aligned(data_len, 256)
+src_addr_virtual = ctypes.addressof(src_mem)
+src_addr_info = mu.virtual_to_physical_addr(src_addr_virtual)
+src_addr = src_addr_info.p_addr
+write_word_to_byte_array(src_mem, 0x0, 1 << 24, LITTLE_ENDIAN)
+# write_word_to_byte_array(src_mem, 0x0, 0x00000000, LITTLE_ENDIAN)
+# write_word_to_byte_array(src_mem, 0x4, 0xffff, LITTLE_ENDIAN)
 
-def print_dma_enabled_state(dma_memory):
-    enable_offset = 0xFF0
-    arr = dma_memory[enable_offset: enable_offset + 4]
-    rev = arr[::-1]
-    print(':'.join(format(x, '08b') for x in rev))
-    return
-
-
-########################
-## Build data to send ##
-########################
-
-data_len = 64  # bytes
-data_mem = mu.ctypes_alloc_aligned(data_len, 32)
-write_word_to_byte_array(data_mem, 0x4, 0b001 << 24)  # set pin 18 mode to output
-# write_word_to_byte_array(data_mem, 0x4, 0b000 << 24)  # set pin 18 mode to output
-# write_word_to_byte_array(data_mem, 0x1C, 0b1 << 18)  # set pin 18
-# write_word_to_byte_array(data_mem, 0x28, 0b1 << 18) # clear pin 18
-
-data_addr_virtual = ctypes.addressof(data_mem)
-data_addr_info = mu.virtual_to_physical_addr(data_addr_virtual)
-data_addr = data_addr_info.p_addr
-
-##################################
-## Build DMA Control Block (CB) ##
-##################################
-
-# CB is 32 bytes long (8 words), though only 24 bytes (6 words) are used
-# CB address must be 256-bit (32-byte) aligned
-cb_mem = mu.ctypes_alloc_aligned(32, 32)
+cb_mem = mu.ctypes_alloc_aligned(32, 256)
 cb_addr_virtual = ctypes.addressof(cb_mem)
 cb_addr = mu.virtual_to_physical_addr(cb_addr_virtual).p_addr
 
-# Define all the fields of the CB.
+# CB Word 0 (transfer settings):
+write_word_to_byte_array(cb_mem, 0x0, 1 << 26, LITTLE_ENDIAN)
+write_word_to_byte_array(cb_mem, 0x4, src_addr, LITTLE_ENDIAN)  # CB WOrd 1 (source address)
+write_word_to_byte_array(cb_mem, 0x8, GPIO_BASE_BUS + 0x4, LITTLE_ENDIAN)  # CB Word 2 (destination address)
+write_word_to_byte_array(cb_mem, 0xC, data_len, LITTLE_ENDIAN)  # CB Word 3 (transfer length)
 
-# CB Word 0:
-# NO_WIDE_BURSTS = 0b1 << 26  # 26
-# WAITS = 0b11111 << 21 # 25:21
-# SRC_WIDTH = 0b1 << 9
-SRC_INC = 0b1 << 8
-# DEST_WIDTH = 0b1 << 5
-DEST_INC = 0b1 << 4
-
-write_word_to_byte_array(cb_mem, 0x0, SRC_INC | DEST_INC)
-
-# CB Word 1 (SRC_ADDR):
-write_word_to_byte_array(cb_mem, 0x4, data_addr)
-
-# CB Word 2 (DEST_ADDR) - physical GPIO memory address:
-gpio_addr = 0x20200000
-write_word_to_byte_array(cb_mem, 0x8, gpio_addr)
-
-# CB Word 3 (TXFR_LEN):
-txfr_len = data_len
-write_word_to_byte_array(cb_mem, 0xC, txfr_len)
-
-# CB Word 4 (STRIDE):
-# Nothing to write, since we're not using 2D Stride
-
-# CB Word 5 (NEXTCONBK):
-# Nothing to write, since we're only sending one control block
-
-##################
-## Write to DMA ##
-##################
-
-PERIPHERAL_BASE = 0x20000000  # Physical
-DMA_OFFSET = 0x7000
-DMA_BASE = PERIPHERAL_BASE + DMA_OFFSET
-
-GPIO_OFFSET = 0x200000
-GPIO_BASE = PERIPHERAL_BASE + GPIO_OFFSET
+with open("/dev/mem", "r+b", buffering=0) as f:
+    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
+                   offset=GPIO_BASE_PHYS) as gpio_mem:
+        print(':'.join(format(x, 'x') for x in gpio_mem[0x4:0x4+data_len]))
 
 with open("/dev/mem", "r+b", buffering=0) as f:
     with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=DMA_BASE) as dma_mem:
-        # print_dma_enabled_state(dma_mem)
-        print_dma_debug_info(dma_mem)
-        write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
-        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
-        # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 29)
-        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
-        # write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31)
-        # print(':'.join(format(x, '08b') for x in dma_mem[0:4][::-1]))
-        write_word_to_byte_array(dma_mem, 0x4, cb_addr)
-        time.sleep(.5)
-        write_word_to_byte_array(dma_mem, 0x0, 0b1)
-        time.sleep(.5)
+        write_word_to_byte_array(dma_mem, 0x0, 0b1 << 31, LITTLE_ENDIAN)  # Reset channel 0
+        write_word_to_byte_array(dma_mem, 0x4, cb_addr, LITTLE_ENDIAN)  # Write address of CB to CB_ADDR register
+        write_word_to_byte_array(dma_mem, 0x0, 0b1, LITTLE_ENDIAN)  # Activate channel 0
 
 with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=GPIO_BASE) as gpio_mem:
-        print(':'.join(format(x, '08b') for x in gpio_mem[4:8][::-1]))
-
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=data_addr_info.frame_start) as m:
-        s = data_addr_info.offset
-        print(':'.join(format(x, '08b') for x in m[s:s+int(data_len/8)][::-1]))
+    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
+                   offset=GPIO_BASE_PHYS) as gpio_mem:
+        print(':'.join(format(x, 'x') for x in gpio_mem[0x4:0x4+data_len]))
