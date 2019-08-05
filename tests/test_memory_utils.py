@@ -1,6 +1,8 @@
 import ctypes
 import unittest
+
 import mmap
+
 import app.memory_utils as mu
 
 
@@ -33,6 +35,16 @@ class TestMemoryUtils(unittest.TestCase):
                            offset=addr_info.frame_start) as m:
                 s = addr_info.offset
                 self.assertEqual(m[s:s + 15], phrase)
+
+    def test_write_word_to_byte_array(self):
+        word = 0xa0b00c0d
+        byte_arr = bytearray(4)
+        mu.write_word_to_byte_array(byte_arr, 0, word)
+
+        self.assertEqual(byte_arr[0], 0x0d)
+        self.assertEqual(byte_arr[1], 0x0c)
+        self.assertEqual(byte_arr[2], 0xb0)
+        self.assertEqual(byte_arr[3], 0xa0)
 
 
 if __name__ == '__main__':
