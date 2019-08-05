@@ -30,6 +30,7 @@ def virtual_to_physical_addr(virtual_addr):
         else:
             raise Exception("Could not get physical memory address for virtual address {}".format(hex(virtual_addr)))
 
+
 # size and alignment are in bytes
 def ctypes_alloc_aligned(size, alignment):
     # Account for a potential shift of up to (alignment-1)
@@ -49,3 +50,8 @@ def ctypes_alloc_aligned(size, alignment):
     ctypes_aligned_memory = ctypes_aligned_type.from_buffer(raw_memory, offset)
 
     return ctypes_aligned_memory
+
+
+def write_word_to_byte_array(byte_array, address, word):
+    byte_array[address: address + 4] = word.to_bytes(4, byteorder='little')
+    return
