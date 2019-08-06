@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import mmap
-
 import app.dma as dma
 
 PERIPHERAL_BASE_PHYS = 0x20000000
@@ -8,23 +6,21 @@ PERIPHERAL_BASE_BUS = 0x7E000000
 GPIO_OFFSET = 0x200000
 GPIO_BASE_PHYS = PERIPHERAL_BASE_PHYS + GPIO_OFFSET
 GPIO_BASE_BUS = PERIPHERAL_BASE_BUS + GPIO_OFFSET
+GPFSEL_BUS = GPIO_BASE_BUS + 0x4
+GPSET0_BUS = GPIO_BASE_BUS + 0x1C
+GPCLR0_BUS = GPIO_BASE_BUS + 0x28
 
-data_len = 4  # bytes
+cb_list = dma.build_linked_cb_list(2)
 
-cb = dma.ControlBlock()
-cb.init_source_data(data_len)
-cb.write_word_to_source_data(0x0, 1<<24)
-cb.set_transfer_information(1 << 26)
-cb.set_destination_addr(GPIO_BASE_BUS + 0x4)
+cb_list[0].init_source_data(4)
+cb_list[0].write_word_to_source_data(0x0, 1<<24)
+cb_list[0].set_transfer_information(1 << 26)
+cb_list[0].set_destination_addr(GPFSEL_BUS)
 
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
-                   offset=GPIO_BASE_PHYS) as gpio_mem:
-        print(':'.join(format(x, 'x') for x in gpio_mem[0x4:0x4 + data_len]))
+cb_list[1].init_source_data(4)
+cb_list[1].write_word_to_source_data(0x0, 1<<18)
+cb_list[1].set_transfer_information(1 << 26)
+cb_list[1].set_destination_addr(GPCLR0_BUS)
+# cb_list[1].set_destination_addr(GPSET0_BUS)
 
-dma.activate_channel_with_cb(0, cb.addr)
-
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
-                   offset=GPIO_BASE_PHYS) as gpio_mem:
-        print(':'.join(format(x, 'x') for x in gpio_mem[0x4:0x4 + data_len]))
+dma.activate_channel_with_cb(0, cb_list[0].addr)

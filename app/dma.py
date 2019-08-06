@@ -64,13 +64,11 @@ def activate_channel_with_cb(channel, cb_addr):
 
 def build_linked_cb_list(length):
     cb_list = []
-
     i = 0
     while i < length:
         new_cb = ControlBlock()
         cb_list.append(new_cb)
-
         if i > 0:
             cb_list[i-1].set_next_cb(new_cb.addr)
-
         i += 1
+    return cb_list
