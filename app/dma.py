@@ -9,7 +9,7 @@ class ControlBlock:
     def __init__(self):
         self.data_mem = None
         self.cb_mem = mu.ctypes_alloc_aligned(32, 32)
-        self.cb_addr = mu.virtual_to_physical_addr(ctypes.addressof(self.cb_mem)).p_addr
+        self.addr = mu.virtual_to_physical_addr(ctypes.addressof(self.cb_mem)).p_addr
 
     def set_transfer_information(self, transfer_information):
         mu.write_word_to_byte_array(self.cb_mem, 0x0, transfer_information)
@@ -22,6 +22,9 @@ class ControlBlock:
         data_addr = mu.virtual_to_physical_addr(ctypes.addressof(self.data_mem)).p_addr
         mu.write_word_to_byte_array(self.cb_mem, 0x4, data_addr)
         mu.write_word_to_byte_array(self.cb_mem, 0xC, size)
+
+    def write_word_to_source_data(self, offset, word):
+        mu.write_word_to_byte_array(self.data_mem, offset, word)
 
     def set_source_data(self, data_byte_arr):
         data_len = len(data_byte_arr)
@@ -68,6 +71,6 @@ def build_linked_cb_list(length):
         cb_list.append(new_cb)
 
         if i > 0:
-            cb_list[i-1].set_next_cb(new_cb.cb_addr)
+            cb_list[i-1].set_next_cb(new_cb.addr)
 
         i += 1
