@@ -33,8 +33,17 @@ class ControlBlock:
         mu.write_word_to_byte_array(self.cb_mem, 0x4, data_addr)
         mu.write_word_to_byte_array(self.cb_mem, 0xC, data_len)
 
-    def set_stride(self, stride):
-        mu.write_word_to_byte_array(self.cb_mem, 0x10, stride)
+    def set_transfer_length_stride(self, x, y):
+        mu.write_word_to_byte_array(self.cb_mem, 0xC, x | (y - 1) << 16)
+
+    def set_stride(self, src, dest):
+        if src < 0:
+            src = src & 0xFFFF
+
+        if dest < 0:
+            dest = dest & 0xFFFF
+
+        mu.write_word_to_byte_array(self.cb_mem, 0x10, src | dest << 16)
 
     def set_next_cb(self, next_cb_addr):
         mu.write_word_to_byte_array(self.cb_mem, 0x14, next_cb_addr)
@@ -69,6 +78,6 @@ def build_linked_cb_list(length):
         new_cb = ControlBlock()
         cb_list.append(new_cb)
         if i > 0:
-            cb_list[i-1].set_next_cb(new_cb.addr)
+            cb_list[i - 1].set_next_cb(new_cb.addr)
         i += 1
     return cb_list
