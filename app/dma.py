@@ -49,9 +49,21 @@ class ControlBlock:
         mu.write_word_to_byte_array(self.cb_mem, 0x14, next_cb_addr)
 
 
-PERIPHERAL_BASE_PHYS = 0x20000000
-DMA_OFFSET = 0x7000
-DMA_BASE = PERIPHERAL_BASE_PHYS + DMA_OFFSET
+# DMA addresses and offsets:
+DMA_BASE = 0x20007000
+DMA_CS = 0x0
+DMA_CB_AD = 0x4
+DMA_DEBUG = 0x20
+
+# DMA constants
+DMA_RESET = 1 << 31
+DMA_INT = 1 << 2
+DMA_END = 1 << 1
+DMA_WAIT_FOR_OUTSTANDING_WRITES = 1 << 28
+DMA_PANIC_PRIORITY = 8 << 20
+DMA_PRIORITY = 8 << 16
+DMA_DEBUG_CLR_ERRORS = 0b111  # Clear Read Error, FIFO Error, Read Last Not Set Error
+DMA_ACTIVE = 1
 
 MMAP_FLAGS = mmap.MAP_SHARED
 MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
@@ -63,12 +75,13 @@ def activate_channel_with_cb(channel, cb_addr):
 
     with open("/dev/mem", "r+b", buffering=0) as f:
         with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=DMA_BASE) as dma_mem:
-            # Reset channel:
-            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + 0x0, 0b1 << 31)
-            # Write address of CB to CB_ADDR register:
-            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + 0x4, cb_addr)
-            # Activate channel:
-            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + 0x0, 0b1)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_RESET)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_INT | DMA_END)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_DEBUG, DMA_DEBUG_CLR_ERRORS)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS,
+                                        DMA_WAIT_FOR_OUTSTANDING_WRITES | DMA_PANIC_PRIORITY | DMA_PRIORITY)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CB_AD, cb_addr)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_ACTIVE)
 
 
 def build_linked_cb_list(length):
