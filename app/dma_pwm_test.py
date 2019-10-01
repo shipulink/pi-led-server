@@ -5,17 +5,49 @@ import mmap
 import app.dma as dma
 import app.memory_utils as mu
 
-DIVISOR = 2
+SRC = 5  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
+DIVISOR = 8
 PWM_CYCLES = 8
 
-# period_ns = (DIVISOR * PWM_CYCLES * 1,000,000,000) / 500,000,000
-# period_ns = DIVISOR * PWM_CYCLES * 2
-# 10 * 12 * 2 = 240 ns. Actual: 725 ns 3x
-# 10 * 8 * 2 =  160 ns. Actual: 375 ns 2.34x
-# 10 * 16 * 2 = 320 ns. Actual: 1300 ns 4x
-# 10 * 24 * 2 = 480 ns. Actual: 2900 ns 6x
+PLAY_SECONDS = 5
+DMA_CH = 0
 
-# 16 * 4 * 2 = 128 ns.  Actual: 175 ns. Grows to 250 ns (???)
+# DMA constants
+DMA_CHA = 0x100 * DMA_CH
+DMA_DIS_DEBUG = 1 << 29
+DMA_NO_WIDE_BURSTS = 1 << 26
+DMA_WAITS = 0 << 21
+DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
+DMA_SRC_IGNORE = 1 << 11
+DMA_SRC_INC = 1 << 8
+DMA_DEST_IGNORE = 1 << 7
+DMA_DEST_DREQ = 1 << 6
+DMA_DEST_INC = 1 << 4
+DMA_WAIT_RESP = 1 << 3
+
+DMA_RESET = 1 << 31
+DMA_INT = 1 << 2
+DMA_END = 1 << 1
+
+PWM_DMA_FLAGS = 0
+PWM_DMA_FLAGS |= DMA_PERMAP
+PWM_DMA_FLAGS |= DMA_DEST_DREQ
+# PWM_DMA_FLAGS |= DMA_WAITS
+# PWM_DMA_FLAGS |= DMA_SRC_IGNORE
+# PWM_DMA_FLAGS |= DMA_DEST_IGNORE
+PWM_DMA_FLAGS |= DMA_NO_WIDE_BURSTS
+PWM_DMA_FLAGS |= DMA_WAIT_RESP
+
+freq = 0
+if SRC == 1:
+    freq = 19200000
+elif SRC == 5:
+    freq = 1000000000
+elif SRC == 6:
+    freq = 500000000
+
+width = 1000000000 / (freq / (DIVISOR * PWM_CYCLES)) + 4 * (DMA_WAITS >> 21)
+print(width)
 
 MMAP_FLAGS = mmap.MAP_SHARED
 MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
@@ -28,7 +60,7 @@ PWM_CLK_DIV = 0x4
 
 # PWM Clock constants
 PWM_CLK_PWD = 0x5A << 24
-PWM_CLK_SRC = 6 << 0  # Source of clock rate = PLLD. Not sure what it is, but its 500MHz.
+PWM_CLK_SRC = SRC << 0
 PWM_CLK_INT_DIV = DIVISOR << 12  # Integer divisor. Clock rate will be SRC clock rate / this.
 PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
@@ -53,14 +85,6 @@ GPIO_BASE = 0x7E200000
 GPFSEL1 = GPIO_BASE + 0x4
 GPSET0 = GPIO_BASE + 0x1C
 GPCLR0 = GPIO_BASE + 0x28
-
-# DMA constants
-DMA_NO_WIDE_BURSTS = 1 << 26
-DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
-DMA_DEST_DREQ = 1 << 6
-DMA_WAIT_RESP = 1 << 3
-DMA_SRC_INC = 1 << 8
-DMA_DEST_INC = 1 << 4
 
 SLEEP_TIME = .1
 
@@ -118,33 +142,32 @@ time.sleep(SLEEP_TIME)
 # Create 4 CBs. CB0: Wait, CB1: Set pin, CB2: Wait, CB3: Clear pin
 cbs = dma.build_linked_cb_list(6)
 
-cbs[0].init_source_data(PWM_CYCLES)
-cbs[0].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_PERMAP | DMA_DEST_DREQ | DMA_WAIT_RESP)
+cbs[0].init_source_data(4)
+# cbs[0].write_word_to_source_data(0x0, 0)
+cbs[0].set_transfer_information(PWM_DMA_FLAGS)
 cbs[0].set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-cbs[1].init_source_data(PWM_CYCLES)
-cbs[1].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_PERMAP | DMA_DEST_DREQ | DMA_WAIT_RESP)
-cbs[1].set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-cbs[2].init_source_data(4)
-cbs[2].write_word_to_source_data(0x0, 1 << 18)  # pin 18
-cbs[2].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
-cbs[2].set_destination_addr(GPCLR0)
-cbs[3].init_source_data(PWM_CYCLES)
-cbs[3].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_PERMAP | DMA_DEST_DREQ | DMA_WAIT_RESP)
-cbs[3].set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-cbs[4].init_source_data(PWM_CYCLES)
-cbs[4].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_PERMAP | DMA_DEST_DREQ | DMA_WAIT_RESP)
-cbs[4].set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-cbs[5].init_source_data(4)
-cbs[5].write_word_to_source_data(0x0, 1 << 18)  # pin 18
-cbs[5].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
-cbs[5].set_destination_addr(GPSET0)
-cbs[5].set_next_cb(cbs[0].addr)
 
-dma.activate_channel_with_cb(5, cbs[0].addr)
+cbs[1].init_source_data(4)
+cbs[1].write_word_to_source_data(0x0, 1 << 18)  # pin 18
+cbs[1].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_WAITS)
+cbs[1].set_destination_addr(GPCLR0)
+
+cbs[2].init_source_data(4)
+# cbs[2].write_word_to_source_data(0x0, 0)
+cbs[2].set_transfer_information(PWM_DMA_FLAGS)
+cbs[2].set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+
+cbs[3].init_source_data(4)
+cbs[3].write_word_to_source_data(0x0, 1 << 18)  # pin 18
+cbs[3].set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_WAITS)
+cbs[3].set_destination_addr(GPSET0)
+cbs[3].set_next_cb(cbs[0].addr)
+
+dma.activate_channel_with_cb(0, cbs[0].addr)
 
 # Have to sleep because otherwise the program finishes too early,
 # and the CBs in memory get cleaned up, so there's nothing for the DMA to reference.
-time.sleep(10)
+time.sleep(PLAY_SECONDS)
 
 # Stop the PWM clock when we're done
 clk_cb.init_source_data(4)
