@@ -5,9 +5,13 @@ import mmap
 import app.dma as dma
 import app.memory_utils as mu
 
-SRC = 5  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
+# 408ns seems to be the lower bound on the period of the generated square wave.
+# It seems DMA can't keep up at lower periods.
+# This means the fastest a pin can be toggled on and off (or off  and on) is 204ns,
+# which is sufficient for driving NeoPixels.
+SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
 DIVISOR = 8
-PWM_CYCLES = 8
+PWM_CYCLES = 16
 
 PLAY_SECONDS = 5
 DMA_CH = 0
@@ -33,10 +37,10 @@ PWM_DMA_FLAGS = 0
 PWM_DMA_FLAGS |= DMA_PERMAP
 PWM_DMA_FLAGS |= DMA_DEST_DREQ
 # PWM_DMA_FLAGS |= DMA_WAITS
-# PWM_DMA_FLAGS |= DMA_SRC_IGNORE
+PWM_DMA_FLAGS |= DMA_SRC_IGNORE
 # PWM_DMA_FLAGS |= DMA_DEST_IGNORE
 PWM_DMA_FLAGS |= DMA_NO_WIDE_BURSTS
-PWM_DMA_FLAGS |= DMA_WAIT_RESP
+# PWM_DMA_FLAGS |= DMA_WAIT_RESP
 
 freq = 0
 if SRC == 1:
