@@ -49,6 +49,61 @@ class ControlBlock:
         mu.write_word_to_byte_array(self.cb_mem, 0x14, next_cb_addr)
 
 
+class ControlBlock2:
+    CB_TI = 0x0
+    CB_SRC_ADDR = 0x4
+    CB_DEST_ADDR = 0x8
+    CB_TXFR_LEN = 0xC
+    CB_STRIDE = 0x10
+    CB_NEXT = 0x14
+
+    DATA_OFFSET = 0x20
+
+    def __init__(self, shared_mem, offset):
+        self.shared_mem = shared_mem
+        self.offset = offset
+        self.addr = mu.virtual_to_physical_addr(ctypes.addressof(self.shared_mem)).p_addr + self.offset
+        self.data_addr = self.addr + self.DATA_OFFSET
+        self.data_len = 4
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_SRC_ADDR, self.data_addr)
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_TXFR_LEN, self.data_len)
+
+    def set_transfer_information(self, transfer_information):
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_TI, transfer_information)
+
+    def set_destination_addr(self, dest_addr):
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_DEST_ADDR, dest_addr)
+
+    def set_source_addr(self, src_addr):
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_SRC_ADDR, src_addr)
+
+    # size is in bytes
+    def init_source_data(self, size):
+        self.data_len = size
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_TXFR_LEN, self.data_len)
+
+    def write_word_to_source_data(self, offset, word):
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.DATA_OFFSET + offset, word)
+
+    # x = transfer length in bytes
+    # y = number of transfers
+    def set_transfer_length_stride(self, x, y):
+        self.data_len = x * y
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_TXFR_LEN, x | (y - 1) << 16)
+
+    def set_stride(self, src, dest):
+        if src < 0:
+            src = src & 0xFFFF
+
+        if dest < 0:
+            dest = dest & 0xFFFF
+
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_STRIDE, src | dest << 16)
+
+    def set_next_cb(self, next_cb_addr):
+        mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_NEXT, next_cb_addr)
+
+
 # DMA addresses and offsets:
 DMA_BASE = 0x20007000
 DMA_CS = 0x0
