@@ -69,7 +69,7 @@ def build_control_array(num_bytes):
 
     i = 0
     while i < num_bits:
-        data[i] = base_addr + 4 * i
+        data[i] = base_addr + 4 * (i + 1)
         i += 1
     return data
 
@@ -85,7 +85,7 @@ def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
     while i < len(src_bytes):
         j = 0
         while j < 8:
-            if src_bytes[i] & (1 << j) == 0:
+            if src_bytes[i] & (128 >> j) == 0:
                 target_int_arr[bit_ind] = ad_low
             else:
                 target_int_arr[bit_ind] = ad_high
@@ -123,7 +123,7 @@ CB_LOW.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_LOW.set_destination_addr(GPCLR0)
 CB_LOW.set_next_cb(CB_UPD.addr)
 
-src_stride = int(len(ctl_arr) / 2)
+src_stride = int(len(ctl_arr) / 2) * 4
 dest_stride = CB_WAIT2.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
 CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr)).p_addr)
@@ -184,6 +184,8 @@ clk_cb.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_SRC_INC
 clk_cb.init_source_data(8)
 clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | PWM_CLK_SRC)
 clk_cb.write_word_to_source_data(PWM_CLK_DIV, PWM_CLK_PWD | PWM_CLK_INT_DIV)
+dma.activate_channel_with_cb(0, clk_cb.addr)
+time.sleep(0.1)
 
 # Start PWM clock
 clk_cb.init_source_data(4)
