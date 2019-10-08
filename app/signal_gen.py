@@ -68,9 +68,10 @@ def build_control_array(num_bytes):
     base_addr = mu.virtual_to_physical_addr(ctypes.addressof(data)).p_addr
 
     i = 0
-    while i < num_bits:
+    while i < num_bits - 1:
         data[i] = base_addr + 4 * (i + 1)
         i += 1
+    data[num_bits - 1] = base_addr
     return data
 
 
@@ -98,7 +99,7 @@ def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
 
 
 # Build control array from incoming bytes
-ints = [0xF7]
+ints = [0b11110111]
 byte_arr = array.array("B", ints)
 ctl_arr = build_control_array(len(byte_arr))
 
@@ -164,14 +165,13 @@ ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr))
 with open("/dev/mem", "r+b", buffering=0) as f:
     with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
         str_arr = []
-        i = 0
-        while i < (len(byte_arr) * 8 + 1) * 2:
-            start = ad_info.offset + i * 4
+        k = 0
+        while k < (len(byte_arr) * 8 + 1) * 2:
+            start = ad_info.offset + k * 4
             end = start + 4
             str_arr.append(''.join(format(x, '02x') for x in m[start:end][::-1]))
-            i += 1
+            k += 1
         print(':'.join(str_arr))
-
 
 ########################################
 # Stop, configure, and start PWM clock #
@@ -219,10 +219,9 @@ time.sleep(0.1)
 #############
 # Start DMA #
 #############
-dma.activate_channel_with_cb(6, CB_WAIT1.addr)
-time.sleep(.1)
-print(''.join(format(x, '02x') for x in shared_mem[0x80 + 0x4:0x80 + 0x4 + 4][::-1]))
-print(''.join(format(x, '02x') for x in shared_mem[0xC0 + 0x14:0xC0 + 0x14 + 4][::-1]))
+start = time.time()
+while time.time() - start < 10:
+    dma.activate_channel_with_cb(6, CB_WAIT1.addr)
 
 ############
 # Stop PWM #
