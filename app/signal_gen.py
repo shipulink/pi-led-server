@@ -24,10 +24,11 @@ DMA_DEST_INC = 1 << 4
 DMA_DEST_DREQ = 1 << 6
 DMA_SRC_INC = 1 << 8
 DMA_SRC_IGNORE = 1 << 11
+DMA_WAITS = 0 << 21
 DMA_NO_WIDE_BURSTS = 1 << 26
 DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
-DMA_FLAGS = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP
+DMA_FLAGS = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_WAITS
 PWM_DMA_FLAGS = DMA_PERMAP | DMA_DEST_DREQ | DMA_SRC_IGNORE | DMA_NO_WIDE_BURSTS
 
 # PWM addresses
@@ -45,8 +46,8 @@ PWM_DMAC_ENAB = 1 << 31  # Enable DMA (So PWM waits for data from DMA)
 PWM_DMAC_THRSHLD = (15 << 8 | 15 << 0)  # Set DMA Panic and DREQ signal thresholds to 15.
 PWM_CTL_CLRF = 1 << 6  # Clear PWM FIFO
 PWM_CTL_USEF1 = 1 << 5  # Use FIFO (instead of DAT register)
-PWM_CTL_PWEN1 = 1 << 0  # Enable PWM
 PWM_CTL_MODE1 = 1 << 1
+PWM_CTL_PWEN1 = 1 << 0  # Enable PWM
 
 # PWM clock addresses and offsets
 PWM_CLK_BASE = 0x7E1010A0
@@ -97,7 +98,7 @@ def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
 
 
 # Build control array from incoming bytes
-ints = [0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0]
+ints = [0xF7]
 byte_arr = array.array("B", ints)
 ctl_arr = build_control_array(len(byte_arr))
 
@@ -154,7 +155,7 @@ CB_WAIT3.set_next_cb(CB_HIGH.addr)
 
 CB_HIGH.set_transfer_information(DMA_FLAGS)
 CB_HIGH.write_word_to_source_data(0x0, 1 << 18)  # pin 18
-CB_HIGH.set_destination_addr(GPCLR0)
+CB_HIGH.set_destination_addr(GPSET0)
 CB_HIGH.set_next_cb(CB_WAIT1.addr)
 
 populate_control_array(ctl_arr, byte_arr, CB_L_TOGGLE.addr, CB_H_TOGGLE.addr, CB_STOP.addr)
