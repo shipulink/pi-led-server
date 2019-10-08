@@ -161,12 +161,17 @@ CB_HIGH.set_next_cb(CB_WAIT1.addr)
 populate_control_array(ctl_arr, byte_arr, CB_L_TOGGLE.addr, CB_H_TOGGLE.addr, CB_STOP.addr)
 
 ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr))
-MMAP_FLAGS = mmap.MAP_SHARED
-MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
 with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as dma_mem:
-        start = 8
-        print(''.join(format(x, '02x') for x in dma_mem[start + ad_info.offset:start + ad_info.offset + 4][::-1]))
+    with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
+        str_arr = []
+        i = 0
+        while i < (len(byte_arr) * 8 + 1) * 2:
+            start = ad_info.offset + i * 4
+            end = start + 4
+            str_arr.append(''.join(format(x, '02x') for x in m[start:end][::-1]))
+            i += 1
+        print(':'.join(str_arr))
+
 
 ########################################
 # Stop, configure, and start PWM clock #
