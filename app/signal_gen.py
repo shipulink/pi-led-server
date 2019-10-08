@@ -27,6 +27,7 @@ DMA_SRC_IGNORE = 1 << 11
 DMA_NO_WIDE_BURSTS = 1 << 26
 DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
+DMA_FLAGS = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP
 PWM_DMA_FLAGS = DMA_PERMAP | DMA_DEST_DREQ | DMA_SRC_IGNORE | DMA_NO_WIDE_BURSTS
 
 # PWM addresses
@@ -116,14 +117,14 @@ CB_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
 CB_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_WAIT1.set_next_cb(CB_LOW.addr)
 
-CB_LOW.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_LOW.set_transfer_information(DMA_FLAGS)
 CB_LOW.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_LOW.set_destination_addr(GPCLR0)
 CB_LOW.set_next_cb(CB_UPD.addr)
 
 src_stride = int(len(ctl_arr) / 2)
 dest_stride = CB_WAIT2.addr + 0x14 - (CB_UPD.addr + 0x4)
-CB_UPD.set_transfer_information(DMA_TD_MODE | DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
 CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr)).p_addr)
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_length_stride(4, 2)
@@ -133,17 +134,17 @@ CB_UPD.set_next_cb(CB_WAIT2.addr)
 CB_WAIT2.set_transfer_information(PWM_DMA_FLAGS)
 CB_WAIT2.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 
-CB_H_TOGGLE.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_H_TOGGLE.set_transfer_information(DMA_FLAGS)
 CB_H_TOGGLE.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_H_TOGGLE.set_destination_addr(GPSET0)
 CB_H_TOGGLE.set_next_cb(CB_WAIT3.addr)
 
-CB_L_TOGGLE.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_L_TOGGLE.set_transfer_information(DMA_FLAGS)
 CB_L_TOGGLE.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_L_TOGGLE.set_destination_addr(GPCLR0)
 CB_L_TOGGLE.set_next_cb(CB_WAIT3.addr)
 
-CB_STOP.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_STOP.set_transfer_information(DMA_FLAGS)
 CB_STOP.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_STOP.set_destination_addr(GPCLR0)
 
@@ -151,22 +152,20 @@ CB_WAIT3.set_transfer_information(PWM_DMA_FLAGS)
 CB_WAIT3.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_WAIT3.set_next_cb(CB_HIGH.addr)
 
-CB_HIGH.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
+CB_HIGH.set_transfer_information(DMA_FLAGS)
 CB_HIGH.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_HIGH.set_destination_addr(GPCLR0)
 CB_HIGH.set_next_cb(CB_WAIT1.addr)
 
 populate_control_array(ctl_arr, byte_arr, CB_L_TOGGLE.addr, CB_H_TOGGLE.addr, CB_STOP.addr)
 
-# print(int(len(arr)/2))
-print(':'.join(format(x, '08x') for x in ctl_arr[0:(len(byte_arr) * 8 + 1) * 2]))
-# ad_info = mu.virtual_to_physical_addr(ctypes.addressof(arr))
-# MMAP_FLAGS = mmap.MAP_SHARED
-# MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
-# with open("/dev/mem", "r+b", buffering=0) as f:
-#     with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as dma_mem:
-#         start = 8
-#         print(''.join(format(x, '02x') for x in dma_mem[start + ad_info.offset:start + ad_info.offset + 4][::-1]))
+ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr))
+MMAP_FLAGS = mmap.MAP_SHARED
+MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
+with open("/dev/mem", "r+b", buffering=0) as f:
+    with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as dma_mem:
+        start = 8
+        print(''.join(format(x, '02x') for x in dma_mem[start + ad_info.offset:start + ad_info.offset + 4][::-1]))
 
 ########################################
 # Stop, configure, and start PWM clock #
@@ -212,6 +211,15 @@ time.sleep(0.1)
 #############
 # Start DMA #
 #############
-while True:
-    dma.activate_channel_with_cb(0, CB_WAIT1.addr)
-    time.sleep(0.01)
+dma.activate_channel_with_cb(6, CB_WAIT1.addr)
+time.sleep(.1)
+print(''.join(format(x, '02x') for x in shared_mem[0x80 + 0x4:0x80 + 0x4 + 4][::-1]))
+print(''.join(format(x, '02x') for x in shared_mem[0xC0 + 0x14:0xC0 + 0x14 + 4][::-1]))
+
+############
+# Stop PWM #
+############
+clk_cb.init_source_data(4)
+clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | PWM_CLK_SRC)
+dma.activate_channel_with_cb(0, clk_cb.addr)
+time.sleep(0.1)
