@@ -50,7 +50,6 @@ PWM_FIFO = 0x18  # FIFO Queue input. This is where we'll be writing dummy data.
 PWM_CYCLES = CYCLES  # PWM period will be this many PWM clock cycles long
 
 # PWM constants
-# PWM constants
 PWM_DMAC_ENAB = 1 << 31  # Enable DMA (So PWM waits for data from DMA)
 PWM_DMAC_THRSHLD = (15 << 8 | 15 << 0)  # Set DMA Panic and DREQ signal thresholds to 15.
 PWM_CTL_CLRF = 1 << 6  # Clear PWM FIFO
