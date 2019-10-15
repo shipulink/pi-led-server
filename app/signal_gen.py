@@ -107,9 +107,6 @@ def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
 
 
 # Build control array from incoming bytes
-# ints = [0b10110110]
-# ints = [0b11111111]
-# ints = [0b0]
 ints = [0x00, 0xFF, 0x00]
 byte_arr = array.array("B", ints)
 ctl_arr = build_control_array(len(byte_arr))
@@ -117,26 +114,22 @@ ctl_arr = build_control_array(len(byte_arr))
 # Allocate enough memory for all the CBs. For each CB, 32 bytes for config, 32 bytes for data.
 shared_mem = mu.ctypes_alloc_aligned(1024, 32)
 
-# CBs common to both the Zero and One flows.
+# CBs for idle loop
 CB_IDLE_WAIT = dma.ControlBlock2(shared_mem, 0x0)
 CB_IDLE_CLR = dma.ControlBlock2(shared_mem, 0x40)
-CB_UPD = dma.ControlBlock2(shared_mem, 0x80)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
-CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0xC0)
-CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x100)
-CB_STOP = dma.ControlBlock2(shared_mem, 0x140)
 
-# CBs for representing a zero
-CB_ZERO_H1 = dma.ControlBlock2(shared_mem, 0x180)
-CB_ZERO_W1 = dma.ControlBlock2(shared_mem, 0x1C0)
-CB_ZERO_L1 = dma.ControlBlock2(shared_mem, 0x200)
+# CBs for data loop
+CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0x80)
+CB_DATA_CLR = dma.ControlBlock2(shared_mem, 0xC0)
+CB_UPD = dma.ControlBlock2(shared_mem, 0x100)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
+CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x140)
+CB_DATA_WAIT3 = dma.ControlBlock2(shared_mem, 0x180)
+CB_STOP = dma.ControlBlock2(shared_mem, 0x1C0)
+CB_ZERO_SET = dma.ControlBlock2(shared_mem, 0x200)
+CB_ONE_SET = dma.ControlBlock2(shared_mem, 0x240)
+CB_ONE_WAIT = dma.ControlBlock2(shared_mem, 0x280)
 
-# CBs for representing a one
-CB_ONE_H1 = dma.ControlBlock2(shared_mem, 0x240)
-CB_ONE_W1 = dma.ControlBlock2(shared_mem, 0x280)
-CB_ONE_W2 = dma.ControlBlock2(shared_mem, 0x2C0)
-CB_ONE_L1 = dma.ControlBlock2(shared_mem, 0x300)
-
-# Configure Common CBs
+# Configure idle loop
 CB_IDLE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
 CB_IDLE_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_IDLE_WAIT.set_next_cb(CB_IDLE_CLR.addr)
@@ -146,62 +139,52 @@ CB_IDLE_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_IDLE_CLR.set_destination_addr(GPCLR0)
 CB_IDLE_CLR.set_next_cb(CB_IDLE_WAIT.addr)
 
+# Configure data loop
+CB_DATA_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
+CB_DATA_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+CB_DATA_WAIT1.set_next_cb(CB_DATA_CLR.addr)
+
+CB_DATA_CLR.set_transfer_information(DMA_FLAGS)
+CB_DATA_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_DATA_CLR.set_destination_addr(GPCLR0)
+CB_DATA_CLR.set_next_cb(CB_UPD.addr)
+
 src_stride = int(len(ctl_arr) / 2) * 4
-dest_stride = CB_DATA_WAIT2.addr + 0x14 - (CB_UPD.addr + 0x4)
+dest_stride = CB_DATA_WAIT3.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
 CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr)).p_addr)
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_length_stride(4, 2)
 CB_UPD.set_stride(src_stride, dest_stride)
-CB_UPD.set_next_cb(CB_DATA_WAIT1.addr)
-
-CB_DATA_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
-CB_DATA_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_DATA_WAIT1.set_next_cb(CB_DATA_WAIT2.addr)
+CB_UPD.set_next_cb(CB_DATA_WAIT2.addr)
 
 CB_DATA_WAIT2.set_transfer_information(PWM_DMA_FLAGS)
 CB_DATA_WAIT2.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+CB_DATA_WAIT2.set_next_cb(CB_DATA_WAIT3.addr)
+
+CB_DATA_WAIT3.set_transfer_information(PWM_DMA_FLAGS)
+CB_DATA_WAIT3.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 
 CB_STOP.set_transfer_information(DMA_FLAGS)
 CB_STOP.write_word_to_source_data(0x0, CB_IDLE_WAIT.addr)
 CB_STOP.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
 CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 
-# Configure CBs for representing a zero
-CB_ZERO_H1.set_transfer_information(DMA_FLAGS)
-CB_ZERO_H1.write_word_to_source_data(0x0, 1 << 18)  # pin 18
-CB_ZERO_H1.set_destination_addr(GPSET0)
-CB_ZERO_H1.set_next_cb(CB_ZERO_W1.addr)
+CB_ZERO_SET.set_transfer_information(DMA_FLAGS)
+CB_ZERO_SET.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_ZERO_SET.set_destination_addr(GPSET0)
+CB_ZERO_SET.set_next_cb(CB_DATA_WAIT1.addr)
 
-CB_ZERO_W1.set_transfer_information(PWM_DMA_FLAGS)
-CB_ZERO_W1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ZERO_W1.set_next_cb(CB_ZERO_L1.addr)
+CB_ONE_SET.set_transfer_information(DMA_FLAGS)
+CB_ONE_SET.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_ONE_SET.set_destination_addr(GPSET0)
+CB_ONE_SET.set_next_cb(CB_ONE_WAIT.addr)
 
-CB_ZERO_L1.set_transfer_information(DMA_FLAGS)
-CB_ZERO_L1.write_word_to_source_data(0x0, 1 << 18)  # pin 18
-CB_ZERO_L1.set_destination_addr(GPCLR0)
-CB_ZERO_L1.set_next_cb(CB_UPD.addr)
+CB_ONE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
+CB_ONE_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+CB_ONE_WAIT.set_next_cb(CB_DATA_WAIT1.addr)
 
-# Configure CBs for representing a one
-CB_ONE_H1.set_transfer_information(DMA_FLAGS)
-CB_ONE_H1.write_word_to_source_data(0x0, 1 << 18)  # pin 18
-CB_ONE_H1.set_destination_addr(GPSET0)
-CB_ONE_H1.set_next_cb(CB_ONE_W1.addr)
-
-CB_ONE_W1.set_transfer_information(PWM_DMA_FLAGS)
-CB_ONE_W1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ONE_W1.set_next_cb(CB_ONE_W2.addr)
-
-CB_ONE_W2.set_transfer_information(PWM_DMA_FLAGS)
-CB_ONE_W2.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ONE_W2.set_next_cb(CB_ONE_L1.addr)
-
-CB_ONE_L1.set_transfer_information(DMA_FLAGS)
-CB_ONE_L1.write_word_to_source_data(0x0, 1 << 18)  # pin 18
-CB_ONE_L1.set_destination_addr(GPCLR0)
-CB_ONE_L1.set_next_cb(CB_UPD.addr)
-
-populate_control_array(ctl_arr, byte_arr, CB_ZERO_H1.addr, CB_ONE_H1.addr, CB_STOP.addr)
+populate_control_array(ctl_arr, byte_arr, CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
 
 ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr))
 with open("/dev/mem", "r+b", buffering=0) as f:
@@ -268,7 +251,6 @@ start = time.time()
 while time.time() - start < PLAY_SECONDS:
     CB_IDLE_CLR.set_next_cb(CB_UPD.addr)
     time.sleep(.001)
-
 
 time.sleep(0.1)
 #############
