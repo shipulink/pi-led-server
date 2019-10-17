@@ -11,7 +11,7 @@ SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
 DIV = 10
 CYCLES = 20
 
-PLAY_SECONDS = 10
+PLAY_SECONDS = 5
 DMA_CH = 6
 
 print(1000000000 / 500000000 * (DIV * CYCLES))
@@ -69,25 +69,41 @@ PWM_CLK_INT_DIV = DIV << 12  # Integer divisor. Clock rate will be SRC clock rat
 PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
 
-def build_control_array(num_bytes):
+def print_mem_view(mem_view):
+    ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mem_view)))
+    with open("/dev/mem", "r+b", buffering=0) as f1:
+        with mmap.mmap(f1.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
+            str_arr = []
+            k = 0
+            while k < len(mem_view):
+                frm = ad_info.offset + k * 4
+                to = frm + 4
+                str_arr.append(''.join(format(x, '02x') for x in m[frm:to][::-1]))
+                k += 1
+            print(':'.join(str_arr))
+
+
+def build_control_mem_view(num_bytes):
     num_bits = num_bytes * 8 + 1
-    c_int_arr = ctypes.c_int32 * (num_bits * 2)
-    data = c_int_arr()
-    base_addr = mu.virtual_to_physical_addr(ctypes.addressof(data)).p_addr
+    size = num_bits * 2
+    data = array.array('l', [0] * size)
+    mv = memoryview(data)
+    base_addr = mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mv))).p_addr
 
     i = 0
     while i < num_bits - 1:
-        data[i] = base_addr + 4 * (i + 1)
+        mv[i] = base_addr + 4 * (i + 1)
         i += 1
-    data[num_bits - 1] = base_addr
-    return data
+    mv[num_bits - 1] = base_addr
+    print_mem_view(mv)
+    return mv
 
 
-def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
-    if (len(src_bytes) * 8 + 1) * 2 != len(target_int_arr):
+def populate_control_array(target_mem_view, src_bytes, ad_low, ad_high, ad_stop):
+    if (len(src_bytes) * 8 + 1) * 2 != len(target_mem_view):
         raise Exception("Length of src_bytes is incompatible with length of target_int_arr.")
 
-    num_bits = int(len(target_int_arr) / 2)
+    num_bits = int(len(target_mem_view) / 2)
 
     bit_ind = num_bits
     i = 0
@@ -95,21 +111,32 @@ def populate_control_array(target_int_arr, src_bytes, ad_low, ad_high, ad_stop):
         j = 0
         while j < 8:
             if src_bytes[i] & (128 >> j) == 0:
-                target_int_arr[bit_ind] = ad_low
+                target_mem_view[bit_ind] = ad_low
             else:
-                target_int_arr[bit_ind] = ad_high
+                target_mem_view[bit_ind] = ad_high
             bit_ind += 1
             j += 1
         i += 1
-    target_int_arr[num_bits * 2 - 1] = ad_stop
-
-    return target_int_arr
+    target_mem_view[num_bits * 2 - 1] = ad_stop
+    print_mem_view(target_mem_view)
+    return target_mem_view
 
 
 # Build control array from incoming bytes
-ints = [0x00, 0xFF, 0x00]
+ints = [
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
+]
 byte_arr = array.array("B", ints)
-ctl_arr = build_control_array(len(byte_arr))
+ctl_mem_view = build_control_mem_view(len(byte_arr))
 
 # Allocate enough memory for all the CBs. For each CB, 32 bytes for config, 32 bytes for data.
 shared_mem = mu.ctypes_alloc_aligned(1024, 32)
@@ -149,10 +176,10 @@ CB_DATA_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_DATA_CLR.set_destination_addr(GPCLR0)
 CB_DATA_CLR.set_next_cb(CB_UPD.addr)
 
-src_stride = int(len(ctl_arr) / 2) * 4
+src_stride = int(len(ctl_mem_view) / 2) * 4
 dest_stride = CB_DATA_WAIT3.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
-CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr)).p_addr)
+CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(ctl_mem_view))).p_addr)
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_length_stride(4, 2)
 CB_UPD.set_stride(src_stride, dest_stride)
@@ -184,19 +211,7 @@ CB_ONE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
 CB_ONE_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_ONE_WAIT.set_next_cb(CB_DATA_WAIT1.addr)
 
-populate_control_array(ctl_arr, byte_arr, CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
-
-ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctl_arr))
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
-        str_arr = []
-        k = 0
-        while k < (len(byte_arr) * 8 + 1) * 2:
-            start = ad_info.offset + k * 4
-            end = start + 4
-            str_arr.append(''.join(format(x, '02x') for x in m[start:end][::-1]))
-            k += 1
-        print(':'.join(str_arr))
+populate_control_array(ctl_mem_view, byte_arr, CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
 
 ########################################
 # Stop, configure, and start PWM clock #
@@ -221,8 +236,8 @@ time.sleep(0.1)
 ###########################
 # Configure and start PWM #
 ###########################
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=PWM_BASE) as pwm_mem:
+with open("/dev/mem", "r+b", buffering=0) as f2:
+    with mmap.mmap(f2.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=PWM_BASE) as pwm_mem:
         mu.write_word_to_byte_array(pwm_mem, PWM_CTL, 0)  # Reset PWM
         mu.write_word_to_byte_array(pwm_mem, PWM_RNG1, PWM_CYCLES)
         mu.write_word_to_byte_array(pwm_mem, PWM_DMAC, PWM_DMAC_ENAB | PWM_DMAC_THRSHLD)
@@ -250,14 +265,14 @@ time.sleep(0.1)
 start = time.time()
 while time.time() - start < PLAY_SECONDS:
     CB_IDLE_CLR.set_next_cb(CB_UPD.addr)
-    time.sleep(.001)
+    time.sleep(.005)
 
 time.sleep(0.1)
 #############
 # Reset PWM #
 #############
-with open("/dev/mem", "r+b", buffering=0) as f:
-    with mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=PWM_BASE) as pwm_mem:
+with open("/dev/mem", "r+b", buffering=0) as f2:
+    with mmap.mmap(f2.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=PWM_BASE) as pwm_mem:
         mu.write_word_to_byte_array(pwm_mem, PWM_CTL, PWM_CTL_CLRF)  # Clear FIFO
         mu.write_word_to_byte_array(pwm_mem, PWM_CTL, 0)  # Reset PWM
 time.sleep(0.1)
