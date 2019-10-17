@@ -59,10 +59,11 @@ class ControlBlock2:
 
     DATA_OFFSET = 0x20
 
-    def __init__(self, shared_mem, offset):
-        self.shared_mem = shared_mem
-        self.offset = offset
-        self.addr = mu.virtual_to_physical_addr(ctypes.addressof(self.shared_mem)).p_addr + self.offset
+    def __init__(self, shared_mem_view, offset):
+        self.shared_mem = shared_mem_view
+        mv_phys_addr = mu.get_mem_view_phys_addr_info(shared_mem_view).p_addr
+        self.offset = offset + 32 - mv_phys_addr % 32
+        self.addr = mv_phys_addr + self.offset
         self.data_addr = self.addr + self.DATA_OFFSET
         self.data_len = 4
         mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_SRC_ADDR, self.data_addr)

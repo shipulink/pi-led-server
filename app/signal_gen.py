@@ -1,5 +1,4 @@
 import array
-import ctypes
 import time
 
 import mmap
@@ -70,7 +69,7 @@ PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
 
 def print_mem_view(mem_view):
-    ad_info = mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mem_view)))
+    ad_info = mu.get_mem_view_phys_addr_info(mem_view)
     with open("/dev/mem", "r+b", buffering=0) as f1:
         with mmap.mmap(f1.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
             str_arr = []
@@ -88,7 +87,7 @@ def build_control_mem_view(num_bytes):
     size = num_bits * 2
     data = array.array('l', [0] * size)
     mv = memoryview(data)
-    base_addr = mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mv))).p_addr
+    base_addr = mu.get_mem_view_phys_addr_info(mv).p_addr
 
     i = 0
     while i < num_bits - 1:
@@ -129,17 +128,18 @@ ints = [
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
 ]
 byte_arr = array.array("B", ints)
 ctl_mem_view = build_control_mem_view(len(byte_arr))
 
 # Allocate enough memory for all the CBs. For each CB, 32 bytes for config, 32 bytes for data.
-shared_mem = mu.ctypes_alloc_aligned(1024, 32)
+# shared_mem = mu.ctypes_alloc_aligned(1024, 32)
+shared_mem = memoryview(bytearray([0] * 1024))
 
 # CBs for idle loop
 CB_IDLE_WAIT = dma.ControlBlock2(shared_mem, 0x0)
@@ -179,7 +179,7 @@ CB_DATA_CLR.set_next_cb(CB_UPD.addr)
 src_stride = int(len(ctl_mem_view) / 2) * 4
 dest_stride = CB_DATA_WAIT3.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
-CB_UPD.set_source_addr(mu.virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(ctl_mem_view))).p_addr)
+CB_UPD.set_source_addr(mu.get_mem_view_phys_addr_info(ctl_mem_view).p_addr)
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_length_stride(4, 2)
 CB_UPD.set_stride(src_stride, dest_stride)

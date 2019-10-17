@@ -30,6 +30,8 @@ def virtual_to_physical_addr(virtual_addr):
         else:
             raise Exception("Could not get physical memory address for virtual address {}".format(hex(virtual_addr)))
 
+def get_mem_view_phys_addr_info(mem_view):
+    return virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mem_view)))
 
 # size and alignment are in bytes
 def ctypes_alloc_aligned(size, alignment):
