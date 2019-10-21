@@ -4,6 +4,7 @@ import time
 import mmap
 
 import app.dma as dma
+import app.led_frame_data as fd
 import app.memory_utils as mu
 
 SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
@@ -135,7 +136,9 @@ ints = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
 ]
 byte_arr = array.array("B", ints)
-ctl_mem_view = build_control_mem_view(len(byte_arr))
+# ctl_mem_view = build_control_mem_view(len(byte_arr))
+
+dma_data = fd.LedDmaFrameData(int(len(byte_arr) / 3))
 
 # Allocate enough memory for all the CBs. For each CB, 32 bytes for config, 32 bytes for data.
 # shared_mem = mu.ctypes_alloc_aligned(1024, 32)
@@ -176,10 +179,10 @@ CB_DATA_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_DATA_CLR.set_destination_addr(GPCLR0)
 CB_DATA_CLR.set_next_cb(CB_UPD.addr)
 
-src_stride = int(len(ctl_mem_view) / 2) * 4
+src_stride = int(dma_data.view_len / 2 * 4)
 dest_stride = CB_DATA_WAIT3.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
-CB_UPD.set_source_addr(mu.get_mem_view_phys_addr_info(ctl_mem_view).p_addr)
+CB_UPD.set_source_addr(dma_data.base_addrs[0])
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_length_stride(4, 2)
 CB_UPD.set_stride(src_stride, dest_stride)
@@ -211,7 +214,8 @@ CB_ONE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
 CB_ONE_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_ONE_WAIT.set_next_cb(CB_DATA_WAIT1.addr)
 
-populate_control_array(ctl_mem_view, byte_arr, CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
+dma_data.set_cb_addrs(CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
+dma_data.populate_with_data(byte_arr)
 
 ########################################
 # Stop, configure, and start PWM clock #

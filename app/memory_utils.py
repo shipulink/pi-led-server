@@ -1,7 +1,13 @@
+import array
 import ctypes
 
 import mmap
 import os
+import random
+
+# MMAP constants:
+MMAP_FLAGS = mmap.MAP_SHARED
+MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
 
 
 class AddrInfo:
@@ -30,8 +36,10 @@ def virtual_to_physical_addr(virtual_addr):
         else:
             raise Exception("Could not get physical memory address for virtual address {}".format(hex(virtual_addr)))
 
+
 def get_mem_view_phys_addr_info(mem_view):
     return virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mem_view)))
+
 
 # size and alignment are in bytes
 def ctypes_alloc_aligned(size, alignment):
@@ -57,3 +65,37 @@ def ctypes_alloc_aligned(size, alignment):
 def write_word_to_byte_array(byte_array, address, word):
     byte_array[address: address + 4] = word.to_bytes(4, byteorder='little')
     return
+
+
+def create_int_mem_view(length):
+    return memoryview(array.array('L', [0] * length))
+
+
+def check_mem_view_physical_contiguous(mv):
+    num_words = len(mv)
+    num_bytes = num_words * 4
+    rand_int = random.getrandbits(32)
+    mv[num_words - 1] = rand_int
+    ad_info = get_mem_view_phys_addr_info(mv)
+    with open("/dev/mem", "r+b", buffering=0) as f:
+        with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
+            offset = ad_info.offset
+            result_int = int.from_bytes(m[offset + num_bytes - 4: offset + num_bytes], byteorder='little')
+            return result_int == rand_int
+
+
+def create_phys_contig_int_views(view_len, num_views):
+    mvs = []
+    fails = 0
+    max_fails = num_views * 2
+    while len(mvs) < num_views:
+        mv = create_int_mem_view(view_len)
+        if check_mem_view_physical_contiguous(mv):
+            mvs.append(mv)
+        else:
+            fails += 1
+            if fails >= max_fails:
+                raise Exception(
+                    "Could not create {} integer memoryviews of length {} that are contiguous in physical memory.".format(
+                        num_views, view_len))
+    return mvs
