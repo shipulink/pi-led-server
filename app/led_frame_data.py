@@ -41,13 +41,6 @@ class LedDmaFrameData:
             self.mvs[i][last_ind] = next_base_addr
             i += 1
 
-        # TODO: Remove after debugging
-        i = 0
-        while i < self.num_views:
-            print(format(self.base_addrs[i], '08x'))
-            print(':'.join(format(x, '08x') for x in self.mvs[i]))
-            i += 1
-
     def set_cb_addrs(self, zero_cb_addr, one_cb_addr, stop_cb_addr):
         self.zero_cb_addr = zero_cb_addr
         self.one_cb_addr = one_cb_addr
@@ -72,6 +65,13 @@ class LedDmaFrameData:
                 self.mvs[i][j: j + 8] = self.byte_reps[data[byte_ind]]
                 byte_ind += 1
                 j += 8
+            i += 1
+
+    def print_debug_info(self):
+        i = 0
+        while i < self.num_views:
+            print(format(self.base_addrs[i], '08x'))
+            print(':'.join(format(x, '08x') for x in self.mvs[i]))
             i += 1
 
 

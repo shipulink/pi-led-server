@@ -15,4 +15,7 @@ ints = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
 ]
 byte_arr = array.array("B", ints)
-fd.LedDmaFrameData(len(byte_arr) / 3)
+dma_data = fd.LedDmaFrameData(len(byte_arr) / 3)
+dma_data.set_cb_addrs(1,2,3)
+dma_data.populate_with_data(byte_arr)
+dma_data.print_debug_info()
