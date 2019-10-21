@@ -30,7 +30,7 @@ class LedDmaFrameData:
                 last_ind = int((self.total_len % self.view_len) / 2 - 1)
                 next_base_addr = self.base_addrs[0]  # link to the first index of first CB
             else:
-                last_ind = self.view_len / 2 - 1
+                last_ind = int(self.view_len / 2 - 1)
                 next_base_addr = self.base_addrs[i + 1]  # link to the first index of the next CB
             base_addr = self.base_addrs[i]
 
@@ -39,6 +39,13 @@ class LedDmaFrameData:
                 self.mvs[i][j] = base_addr + 4 * (j + 1)
                 j += 1
             self.mvs[i][last_ind] = next_base_addr
+            i += 1
+
+        # TODO: Remove after debugging
+        i = 0
+        while i < self.num_views:
+            print(format(self.base_addrs[i], '08x'))
+            print(':'.join(format(x, '08x') for x in self.mvs[i]))
             i += 1
 
     def set_cb_addrs(self, zero_cb_addr, one_cb_addr, stop_cb_addr):
