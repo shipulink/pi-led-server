@@ -11,7 +11,7 @@ SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
 DIV = 10
 CYCLES = 20
 
-PLAY_SECONDS = 5
+PLAY_SECONDS = 2
 DMA_CH = 6
 
 print(1000000000 / 500000000 * (DIV * CYCLES))
@@ -68,71 +68,17 @@ PWM_CLK_SRC = SRC << 0
 PWM_CLK_INT_DIV = DIV << 12  # Integer divisor. Clock rate will be SRC clock rate / this.
 PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
-
-def print_mem_view(mem_view):
-    ad_info = mu.get_mem_view_phys_addr_info(mem_view)
-    with open("/dev/mem", "r+b", buffering=0) as f1:
-        with mmap.mmap(f1.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
-            str_arr = []
-            k = 0
-            while k < len(mem_view):
-                frm = ad_info.offset + k * 4
-                to = frm + 4
-                str_arr.append(''.join(format(x, '02x') for x in m[frm:to][::-1]))
-                k += 1
-            print(':'.join(str_arr))
-
-
-def build_control_mem_view(num_bytes):
-    num_bits = num_bytes * 8 + 1
-    size = num_bits * 2
-    data = array.array('l', [0] * size)
-    mv = memoryview(data)
-    base_addr = mu.get_mem_view_phys_addr_info(mv).p_addr
-
-    i = 0
-    while i < num_bits - 1:
-        mv[i] = base_addr + 4 * (i + 1)
-        i += 1
-    mv[num_bits - 1] = base_addr
-    print_mem_view(mv)
-    return mv
-
-
-def populate_control_array(target_mem_view, src_bytes, ad_low, ad_high, ad_stop):
-    if (len(src_bytes) * 8 + 1) * 2 != len(target_mem_view):
-        raise Exception("Length of src_bytes is incompatible with length of target_int_arr.")
-
-    num_bits = int(len(target_mem_view) / 2)
-
-    bit_ind = num_bits
-    i = 0
-    while i < len(src_bytes):
-        j = 0
-        while j < 8:
-            if src_bytes[i] & (128 >> j) == 0:
-                target_mem_view[bit_ind] = ad_low
-            else:
-                target_mem_view[bit_ind] = ad_high
-            bit_ind += 1
-            j += 1
-        i += 1
-    target_mem_view[num_bits * 2 - 1] = ad_stop
-    print_mem_view(target_mem_view)
-    return target_mem_view
-
-
 # Build control array from incoming bytes
 ints = [
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
 ]
 byte_arr = array.array("B", ints)
@@ -140,24 +86,23 @@ byte_arr = array.array("B", ints)
 
 dma_data = fd.LedDmaFrameData(int(len(byte_arr) / 3))
 
-# Allocate enough memory for all the CBs. For each CB, 32 bytes for config, 32 bytes for data.
-# shared_mem = mu.ctypes_alloc_aligned(1024, 32)
-shared_mem = memoryview(bytearray([0] * 1024))
+# Allocate enough memory for all the CBs.
+shared_mem = mu.create_phys_contig_byte_view(544)
 
-# CBs for idle loop
+# CBs that don't need dedicated space for source data
 CB_IDLE_WAIT = dma.ControlBlock2(shared_mem, 0x0)
-CB_IDLE_CLR = dma.ControlBlock2(shared_mem, 0x40)
+CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0x20)
+CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x40)
+CB_DATA_WAIT3 = dma.ControlBlock2(shared_mem, 0x60)
+CB_ONE_WAIT = dma.ControlBlock2(shared_mem, 0x80)
+CB_UPD = dma.ControlBlock2(shared_mem, 0xA0)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
 
-# CBs for data loop
-CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0x80)
-CB_DATA_CLR = dma.ControlBlock2(shared_mem, 0xC0)
-CB_UPD = dma.ControlBlock2(shared_mem, 0x100)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
-CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x140)
-CB_DATA_WAIT3 = dma.ControlBlock2(shared_mem, 0x180)
-CB_STOP = dma.ControlBlock2(shared_mem, 0x1C0)
-CB_ZERO_SET = dma.ControlBlock2(shared_mem, 0x200)
-CB_ONE_SET = dma.ControlBlock2(shared_mem, 0x240)
-CB_ONE_WAIT = dma.ControlBlock2(shared_mem, 0x280)
+# CBs that need dedicated space for data
+CB_IDLE_CLR = dma.ControlBlock2(shared_mem, 0xC0)
+CB_DATA_CLR = dma.ControlBlock2(shared_mem, 0x100)
+CB_STOP = dma.ControlBlock2(shared_mem, 0x140)
+CB_ZERO_SET = dma.ControlBlock2(shared_mem, 0x180)
+CB_ONE_SET = dma.ControlBlock2(shared_mem, 0x1C0)
 
 # Configure idle loop
 CB_IDLE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
@@ -216,6 +161,7 @@ CB_ONE_WAIT.set_next_cb(CB_DATA_WAIT1.addr)
 
 dma_data.set_cb_addrs(CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
 dma_data.populate_with_data(byte_arr)
+# dma_data.print_debug_info()
 
 ########################################
 # Stop, configure, and start PWM clock #

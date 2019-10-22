@@ -71,17 +71,45 @@ def create_int_mem_view(length):
     return memoryview(array.array('L', [0] * length))
 
 
-def check_mem_view_physical_contiguous(mv):
+def check_int_mem_view_physical_contiguous(mv):
     num_words = len(mv)
     num_bytes = num_words * 4
-    rand_int = random.getrandbits(32)
-    mv[num_words - 1] = rand_int
+    original_int_val = mv[num_words - 1]
+    mv[num_words - 1] = random.getrandbits(32)
     ad_info = get_mem_view_phys_addr_info(mv)
     with open("/dev/mem", "r+b", buffering=0) as f:
         with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
             offset = ad_info.offset
             result_int = int.from_bytes(m[offset + num_bytes - 4: offset + num_bytes], byteorder='little')
-            return result_int == rand_int
+            is_contiguous = result_int == mv[num_words - 1]
+            mv[num_words - 1] = original_int_val
+            return is_contiguous
+
+
+def check_byte_mem_view_physical_contiguous(mv):
+    num_bytes = len(mv)
+    original_byte_val = mv[num_bytes - 1]
+    mv[num_bytes - 1] = random.getrandbits(8)
+    ad_info = get_mem_view_phys_addr_info(mv)
+    with open("/dev/mem", "r+b", buffering=0) as f:
+        with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
+            offset = ad_info.offset
+            result_byte = m[offset + num_bytes - 1]
+            is_contiguous = result_byte == mv[num_bytes - 1]
+            mv[num_bytes - 1] = original_byte_val
+            return is_contiguous
+
+
+def create_phys_contig_byte_view(view_len):
+    fails = 0
+    while fails < 5:
+        mv = memoryview(bytearray([0] * view_len))
+        if check_byte_mem_view_physical_contiguous(mv):
+            return mv
+        else:
+            fails += 1
+    raise Exception(
+        "Could not create a byte memoryview of length {} that is contiguous in physical memory.".format(view_len))
 
 
 def create_phys_contig_int_views(view_len, num_views):
@@ -90,7 +118,7 @@ def create_phys_contig_int_views(view_len, num_views):
     max_fails = num_views * 2
     while len(mvs) < num_views:
         mv = create_int_mem_view(view_len)
-        if check_mem_view_physical_contiguous(mv):
+        if check_int_mem_view_physical_contiguous(mv):
             mvs.append(mv)
         else:
             fails += 1
