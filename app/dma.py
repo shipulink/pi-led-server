@@ -134,8 +134,7 @@ def activate_channel_with_cb(channel, cb_addr):
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_RESET)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_INT | DMA_END)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_DEBUG, DMA_DEBUG_CLR_ERRORS)
-            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS,
-                                        DMA_WAIT_FOR_OUTSTANDING_WRITES | DMA_PANIC_PRIORITY | DMA_PRIORITY)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_PANIC_PRIORITY | DMA_PRIORITY)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CB_AD, cb_addr)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_ACTIVE)
 
