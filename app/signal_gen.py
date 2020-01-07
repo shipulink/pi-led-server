@@ -7,14 +7,19 @@ import app.dma as dma
 import app.led_frame_data as fd
 import app.memory_utils as mu
 
-SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
-DIV = 10
-CYCLES = 30
+# SRC   DIV     FRAC    CYCLES      DELAY
+# 6     4       1394    46          399.3
+# 6     4       1394    42          364.6
 
-PLAY_SECONDS = 15
+SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
+DIV = 4
+DIV_FRAC = 1394
+CYCLES = 42
+
+PLAY_SECONDS = 1
 DMA_CH = 6
 
-print(1000000000 / 500000000 * (DIV * CYCLES))
+print(1000000000 / 500000000 * ((DIV + DIV_FRAC / 4096) * CYCLES))
 
 # MMAP constants:
 MMAP_FLAGS = mmap.MAP_SHARED
@@ -33,7 +38,7 @@ DMA_DEST_INC = 1 << 4
 DMA_DEST_DREQ = 1 << 6
 DMA_SRC_INC = 1 << 8
 DMA_SRC_IGNORE = 1 << 11
-DMA_WAITS = 12 << 21
+DMA_WAITS = 0 << 21
 DMA_NO_WIDE_BURSTS = 1 << 26
 DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
@@ -65,6 +70,7 @@ PWM_CLK_DIV = 0x4
 # PWM clock constants
 PWM_CLK_PWD = 0x5A << 24
 PWM_CLK_SRC = SRC << 0
+PWM_CLK_DIV_FRAC = DIV_FRAC
 PWM_CLK_INT_DIV = DIV << 12  # Integer divisor. Clock rate will be SRC clock rate / this.
 PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
@@ -74,7 +80,8 @@ ints = [
     # 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
     # 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00
     0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11
-    # 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF
+    # 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF
+    # 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 ]
 byte_arr = array.array("B", ints)
 # ctl_mem_view = build_control_mem_view(len(byte_arr))
@@ -89,8 +96,9 @@ CB_IDLE_WAIT = dma.ControlBlock2(shared_mem, 0x0)
 CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0x20)
 CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x40)
 CB_DATA_WAIT3 = dma.ControlBlock2(shared_mem, 0x60)
-CB_ONE_WAIT = dma.ControlBlock2(shared_mem, 0x80)
-CB_UPD = dma.ControlBlock2(shared_mem, 0xA0)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
+CB_DATA_WAIT4 = dma.ControlBlock2(shared_mem, 0x80)
+CB_ONE_WAIT = dma.ControlBlock2(shared_mem, 0xA0)
+CB_UPD = dma.ControlBlock2(shared_mem, 0xC0)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
 
 # CBs that need dedicated space for data
 CB_IDLE_CLR = dma.ControlBlock2(shared_mem, 0xC0)
@@ -120,7 +128,7 @@ CB_DATA_CLR.set_destination_addr(GPCLR0)
 CB_DATA_CLR.set_next_cb(CB_UPD.addr)
 
 src_stride = int(dma_data.view_len / 2 * 4)
-dest_stride = CB_DATA_WAIT3.addr + 0x14 - (CB_UPD.addr + 0x4)
+dest_stride = CB_DATA_WAIT4.addr + 0x14 - (CB_UPD.addr + 0x4)
 CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
 CB_UPD.set_source_addr(dma_data.base_addrs[0])
 CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
@@ -134,6 +142,10 @@ CB_DATA_WAIT2.set_next_cb(CB_DATA_WAIT3.addr)
 
 CB_DATA_WAIT3.set_transfer_information(PWM_DMA_FLAGS)
 CB_DATA_WAIT3.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+CB_DATA_WAIT3.set_next_cb(CB_DATA_WAIT4.addr)
+
+CB_DATA_WAIT4.set_transfer_information(PWM_DMA_FLAGS)
+CB_DATA_WAIT4.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 
 CB_STOP.set_transfer_information(DMA_FLAGS)
 CB_STOP.write_word_to_source_data(0x0, CB_IDLE_WAIT.addr)
@@ -171,7 +183,7 @@ clk_cb.set_transfer_information(DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_SRC_INC
 # Stop and configure PWM clock
 clk_cb.init_source_data(8)
 clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | PWM_CLK_SRC)
-clk_cb.write_word_to_source_data(PWM_CLK_DIV, PWM_CLK_PWD | PWM_CLK_INT_DIV)
+clk_cb.write_word_to_source_data(PWM_CLK_DIV, PWM_CLK_PWD | PWM_CLK_DIV_FRAC | PWM_CLK_INT_DIV)
 dma.activate_channel_with_cb(DMA_CH, clk_cb.addr)
 time.sleep(0.1)
 
