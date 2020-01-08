@@ -154,8 +154,8 @@ CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 # Looks like the following timing works for zeroes
 # 12 waits + the time it takes to write one extra word + 12 more waits
 CB_ZERO_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
-CB_ZERO_SET.init_source_data(8)
-CB_ZERO_SET.write_word_to_source_data(0x4, 1 << 18)  # pin 18
+CB_ZERO_SET.init_source_data(12)
+CB_ZERO_SET.write_word_to_source_data(0x8, 1 << 18)  # pin 18
 CB_ZERO_SET.set_destination_addr(GPSET0)
 CB_ZERO_SET.set_next_cb(CB_DATA_CLR.addr)
 
