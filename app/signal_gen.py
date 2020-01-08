@@ -38,7 +38,7 @@ DMA_DEST_INC = 1 << 4
 DMA_DEST_DREQ = 1 << 6
 DMA_SRC_INC = 1 << 8
 DMA_SRC_IGNORE = 1 << 11
-DMA_WAITS = 8 << 21
+DMA_WAITS = 12 << 21
 DMA_NO_WIDE_BURSTS = 1 << 26
 DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
@@ -155,7 +155,7 @@ CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 # 12 waits + the time it takes to write one extra word + 12 more waits
 CB_ZERO_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
 CB_ZERO_SET.init_source_data(8)
-CB_ZERO_SET.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_ZERO_SET.write_word_to_source_data(0x4, 1 << 18)  # pin 18
 CB_ZERO_SET.set_destination_addr(GPSET0)
 CB_ZERO_SET.set_next_cb(CB_DATA_CLR.addr)
 
