@@ -104,6 +104,7 @@ class ControlBlock2:
     def set_next_cb(self, next_cb_addr):
         mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_NEXT, next_cb_addr)
 
+
 class ControlBlock3:
     CB_TI = 0
     CB_SRC_ADDR = 1
@@ -159,6 +160,7 @@ class ControlBlock3:
     def set_next_cb(self, next_cb_addr):
         self.shared_mem[self.offset + self.CB_NEXT] = next_cb_addr
 
+
 # DMA addresses and offsets:
 DMA_BASE = 0x20007000
 DMA_CS = 0x0
@@ -188,7 +190,8 @@ def activate_channel_with_cb(channel, cb_addr):
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_RESET)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_INT | DMA_END)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_DEBUG, DMA_DEBUG_CLR_ERRORS)
-            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_PANIC_PRIORITY | DMA_PRIORITY)
+            mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS,
+                                        DMA_WAIT_FOR_OUTSTANDING_WRITES | DMA_PANIC_PRIORITY | DMA_PRIORITY)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CB_AD, cb_addr)
             mu.write_word_to_byte_array(dma_mem, 0x100 * channel + DMA_CS, DMA_ACTIVE)
 
