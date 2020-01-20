@@ -104,6 +104,60 @@ class ControlBlock2:
     def set_next_cb(self, next_cb_addr):
         mu.write_word_to_byte_array(self.shared_mem, self.offset + self.CB_NEXT, next_cb_addr)
 
+class ControlBlock3:
+    CB_TI = 0
+    CB_SRC_ADDR = 1
+    CB_DEST_ADDR = 2
+    CB_TXFR_LEN = 3
+    CB_STRIDE = 4
+    CB_NEXT = 5
+
+    DATA_OFFSET = 0x20
+
+    def __init__(self, shared_mem_view, offset):
+        self.shared_mem = shared_mem_view
+        mv_phys_addr = mu.get_mem_view_phys_addr_info(self.shared_mem).p_addr
+        self.offset = int(((offset * 4) + 32 - mv_phys_addr % 32) / 4)
+        self.addr = mv_phys_addr + self.offset * 4
+        self.data_addr = self.addr + self.DATA_OFFSET
+        self.data_len = 4
+        self.shared_mem[self.offset + self.CB_SRC_ADDR] = self.data_addr
+        self.shared_mem[self.offset + self.CB_TXFR_LEN] = self.data_len
+
+    def set_transfer_information(self, transfer_information):
+        self.shared_mem[self.offset + self.CB_TI] = transfer_information
+
+    def set_destination_addr(self, dest_addr):
+        self.shared_mem[self.offset + self.CB_DEST_ADDR] = dest_addr
+
+    def set_source_addr(self, src_addr):
+        self.shared_mem[self.offset + self.CB_SRC_ADDR] = src_addr
+
+    # size is in bytes
+    def init_source_data(self, size):
+        self.data_len = size
+        self.shared_mem[self.offset + self.CB_TXFR_LEN] = self.data_len
+
+    def write_word_to_source_data(self, offset, word):
+        self.shared_mem[self.offset + int(self.DATA_OFFSET / 4) + offset] = word
+
+    # x = transfer length in bytes
+    # y = number of transfers
+    def set_transfer_length_stride(self, x, y):
+        self.data_len = x * y
+        self.shared_mem[self.offset + self.CB_TXFR_LEN] = x | (y - 1) << 16
+
+    def set_stride(self, src, dest):
+        if src < 0:
+            src = src & 0xFFFF
+
+        if dest < 0:
+            dest = dest & 0xFFFF
+
+        self.shared_mem[self.offset + self.CB_STRIDE] = src | dest << 16
+
+    def set_next_cb(self, next_cb_addr):
+        self.shared_mem[self.offset + self.CB_NEXT] = next_cb_addr
 
 # DMA addresses and offsets:
 DMA_BASE = 0x20007000

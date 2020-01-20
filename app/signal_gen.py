@@ -13,11 +13,11 @@ import app.memory_utils as mu
 
 SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
 DIV = 4
-DIV_FRAC = 1394
-CYCLES = 80
+DIV_FRAC = 0
+CYCLES = 40
 
 PLAY_SECONDS = 10
-DMA_CH = 6
+DMA_CH = 2
 
 print(1000000000 / 500000000 * ((DIV + DIV_FRAC / 4096) * CYCLES))
 
@@ -60,6 +60,7 @@ PWM_DMAC_THRSHLD = (15 << 8 | 15 << 0)  # Set DMA Panic and DREQ signal threshol
 PWM_CTL_CLRF = 1 << 6  # Clear PWM FIFO
 PWM_CTL_USEF1 = 1 << 5  # Use FIFO (instead of DAT register)
 PWM_CTL_MODE1 = 1 << 1
+PWM_CTL_RPTL1 = 1 << 2
 PWM_CTL_PWEN1 = 1 << 0  # Enable PWM
 
 # PWM clock addresses and offsets
@@ -76,35 +77,33 @@ PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
 # Build control array from incoming bytes
 ints = [
-    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    # 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11
     # 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF
     # 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 ]
 byte_arr = array.array("B", ints)
-# ctl_mem_view = build_control_mem_view(len(byte_arr))
 
 dma_data = fd.LedDmaFrameData(int(len(byte_arr) / 3))
 
 # Allocate enough memory for all the CBs.
-shared_mem = mu.create_phys_contig_byte_view(0x240)
+shared_mem = mu.create_phys_contig_int_view(256)
 
 # CBs that don't need dedicated space for source data
-CB_IDLE_WAIT = dma.ControlBlock2(shared_mem, 0x0)
-CB_DATA_WAIT1 = dma.ControlBlock2(shared_mem, 0x20)
-CB_DATA_WAIT2 = dma.ControlBlock2(shared_mem, 0x40)
-CB_DATA_WAIT3 = dma.ControlBlock2(shared_mem, 0x60)
-CB_DATA_WAIT4 = dma.ControlBlock2(shared_mem, 0x80)
-CB_ONE_WAIT1 = dma.ControlBlock2(shared_mem, 0xA0)
-CB_ONE_WAIT2 = dma.ControlBlock2(shared_mem, 0xC0)
-CB_UPD = dma.ControlBlock2(shared_mem, 0xE0)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
+CB_IDLE_WAIT = dma.ControlBlock3(shared_mem, 0)
+CB_DATA_WAIT1 = dma.ControlBlock3(shared_mem, 8)
+CB_DATA_WAIT2 = dma.ControlBlock3(shared_mem, 16)
+CB_DATA_WAIT3 = dma.ControlBlock3(shared_mem, 24)
+CB_DATA_WAIT4 = dma.ControlBlock3(shared_mem, 32)
+CB_ONE_WAIT1 = dma.ControlBlock3(shared_mem, 64)
+CB_UPD = dma.ControlBlock3(shared_mem, 72)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
 
 # CBs that need dedicated space for data
-CB_IDLE_CLR = dma.ControlBlock2(shared_mem, 0x100)
-CB_DATA_CLR = dma.ControlBlock2(shared_mem, 0x140)
-CB_STOP = dma.ControlBlock2(shared_mem, 0x180)
-CB_ZERO_SET = dma.ControlBlock2(shared_mem, 0x1C0)
-CB_ONE_SET = dma.ControlBlock2(shared_mem, 0x200)
+CB_IDLE_CLR = dma.ControlBlock3(shared_mem, 80)
+CB_DATA_CLR = dma.ControlBlock3(shared_mem, 96)
+CB_STOP = dma.ControlBlock3(shared_mem, 112)
+CB_ZERO_SET = dma.ControlBlock3(shared_mem, 128)
+CB_ONE_SET = dma.ControlBlock3(shared_mem, 144)
 
 # Configure idle loop
 CB_IDLE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
@@ -151,27 +150,19 @@ CB_STOP.write_word_to_source_data(0x0, CB_IDLE_WAIT.addr)
 CB_STOP.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
 CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 
-# Looks like the following timing works for zeroes
-# 12 waits + the time it takes to write one extra word + 12 more waits
 CB_ZERO_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
-CB_ZERO_SET.init_source_data(12)
-CB_ZERO_SET.write_word_to_source_data(0x8, 1 << 18)  # pin 18
+CB_ZERO_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
 CB_ZERO_SET.set_destination_addr(GPSET0)
-CB_ZERO_SET.set_next_cb(CB_DATA_CLR.addr)
+CB_ZERO_SET.set_next_cb(CB_DATA_WAIT1.addr)
 
 CB_ONE_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
-CB_ONE_SET.init_source_data(8)
-CB_ONE_SET.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_ONE_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
 CB_ONE_SET.set_destination_addr(GPSET0)
 CB_ONE_SET.set_next_cb(CB_ONE_WAIT1.addr)
 
 CB_ONE_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
 CB_ONE_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ONE_WAIT1.set_next_cb(CB_ONE_WAIT2.addr)
-
-CB_ONE_WAIT2.set_transfer_information(PWM_DMA_FLAGS)
-CB_ONE_WAIT2.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ONE_WAIT2.set_next_cb(CB_DATA_WAIT1.addr)
+CB_ONE_WAIT1.set_next_cb(CB_DATA_WAIT1.addr)
 
 dma_data.set_cb_addrs(CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
 dma_data.populate_with_data(byte_arr)

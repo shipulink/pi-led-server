@@ -6,7 +6,10 @@ import os
 import random
 
 # MMAP constants:
+MAP_NORERSERVE = 0x4000
+MAP_LOCKED = 0x2000
 MMAP_FLAGS = mmap.MAP_SHARED
+MMAP_FLAGS2 = mmap.MAP_SHARED | mmap.MAP_ANONYMOUS | MAP_NORERSERVE | MAP_LOCKED
 MMAP_PROT = mmap.PROT_READ | mmap.PROT_WRITE
 
 
@@ -86,44 +89,19 @@ def check_int_mem_view_physical_contiguous(mv):
             return is_contiguous
 
 
-def check_byte_mem_view_physical_contiguous(mv):
-    num_bytes = len(mv)
-    original_byte_val = mv[num_bytes - 1]
-    mv[num_bytes - 1] = random.getrandbits(8)
-    ad_info = get_mem_view_phys_addr_info(mv)
-    with open("/dev/mem", "r+b", buffering=0) as f:
-        with mmap.mmap(f.fileno(), 4096 * 4, MMAP_FLAGS, MMAP_PROT, offset=ad_info.frame_start) as m:
-            offset = ad_info.offset
-            result_byte = m[offset + num_bytes - 1]
-            is_contiguous = result_byte == mv[num_bytes - 1]
-            mv[num_bytes - 1] = original_byte_val
-            return is_contiguous
-
-
-def create_phys_contig_byte_view(view_len):
+def create_phys_contig_int_view(view_len):
     fails = 0
     while fails < 5:
-        mv = memoryview(bytearray([0] * view_len))
-        if check_byte_mem_view_physical_contiguous(mv):
+        mv = create_int_mem_view(view_len)
+        if check_int_mem_view_physical_contiguous(mv):
             return mv
         else:
             fails += 1
     raise Exception(
         "Could not create a byte memoryview of length {} that is contiguous in physical memory.".format(view_len))
 
-
 def create_phys_contig_int_views(view_len, num_views):
     mvs = []
-    fails = 0
-    max_fails = num_views * 2
     while len(mvs) < num_views:
-        mv = create_int_mem_view(view_len)
-        if check_int_mem_view_physical_contiguous(mv):
-            mvs.append(mv)
-        else:
-            fails += 1
-            if fails >= max_fails:
-                raise Exception(
-                    "Could not create {} integer memoryviews of length {} that are contiguous in physical memory.".format(
-                        num_views, view_len))
+        mvs.append(create_phys_contig_int_view(view_len))
     return mvs
