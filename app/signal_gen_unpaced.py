@@ -5,7 +5,7 @@ import app.dma as dma
 import app.led_frame_data as fd
 import app.memory_utils as mu
 
-PLAY_SECONDS = 10
+PLAY_SECONDS = 5
 DMA_CH = 2
 
 # GPIO addresses
@@ -21,6 +21,8 @@ DMA_DEST_INC = 1 << 4
 DMA_SRC_INC = 1 << 8
 DMA_SRC_IGNORE = 1 << 11
 DMA_WAITS = 31 << 21
+DMA_WAITS_ZERO = 12 << 21
+DMA_WAITS_ONE = 20 << 21
 DMA_NO_WIDE_BURSTS = 1 << 26
 
 DMA_FLAGS_DATA = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP
@@ -90,7 +92,7 @@ CB_STOP.write_word_to_source_data(0, CB_IDLE_WAIT.addr)
 CB_STOP.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
 CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 
-CB_ZERO_SET.set_transfer_information(DMA_FLAGS_DATA | 12 < 21)
+CB_ZERO_SET.set_transfer_information(DMA_FLAGS_DATA | DMA_WAITS_ZERO)
 CB_ZERO_SET.init_source_data(8)
 CB_ZERO_SET.write_word_to_source_data(1, 1 << 18)  # pin 18
 CB_ZERO_SET.set_destination_addr(GPSET0)
@@ -101,11 +103,11 @@ CB_ONE_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
 CB_ONE_SET.set_destination_addr(GPSET0)
 CB_ONE_SET.set_next_cb(CB_ONE_WAIT1.addr)
 
-CB_ONE_WAIT1.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS)
+CB_ONE_WAIT1.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS_ONE)
 CB_ONE_WAIT1.set_destination_addr(GPCLR0)
 CB_ONE_WAIT1.set_next_cb(CB_ONE_WAIT2.addr)
 
-CB_ONE_WAIT2.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS)
+CB_ONE_WAIT2.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS_ONE)
 CB_ONE_WAIT2.set_destination_addr(GPCLR0)
 CB_ONE_WAIT2.set_next_cb(CB_DATA_CLR.addr)
 
