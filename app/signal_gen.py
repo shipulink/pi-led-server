@@ -7,16 +7,12 @@ import app.dma as dma
 import app.led_frame_data as fd
 import app.memory_utils as mu
 
-# SRC   DIV     FRAC    CYCLES      DELAY
-# 6     4       1394    46          399.3
-# 6     4       1394    42          364.6
-
 SRC = 6  # 1 = Oscillator = 19.2MHz; 5 = PLLC = 1GHz; 6 = PLLD = 500MHz
-DIV = 4
+DIV = 5
 DIV_FRAC = 0
-CYCLES = 40
+CYCLES = 150
 
-PLAY_SECONDS = 10
+PLAY_SECONDS = 60
 DMA_CH = 2
 
 print(1000000000 / 500000000 * ((DIV + DIV_FRAC / 4096) * CYCLES))
@@ -39,11 +35,14 @@ DMA_DEST_DREQ = 1 << 6
 DMA_SRC_INC = 1 << 8
 DMA_SRC_IGNORE = 1 << 11
 DMA_WAITS = 12 << 21
+DMA_WAITS_ZERO = 0 << 21
+DMA_WAITS_ONE = 20 << 21
 DMA_NO_WIDE_BURSTS = 1 << 26
 DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
-DMA_FLAGS = DMA_NO_WIDE_BURSTS
-PWM_DMA_FLAGS = DMA_PERMAP | DMA_DEST_DREQ | DMA_NO_WIDE_BURSTS | DMA_SRC_IGNORE
+DMA_FLAGS_DATA = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP
+DMA_FLAGS_WAIT = DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP | DMA_SRC_IGNORE
+DMA_FLAGS_PWM = DMA_NO_WIDE_BURSTS | DMA_SRC_IGNORE | DMA_PERMAP | DMA_DEST_DREQ
 
 # PWM addresses
 PWM_BASE = 0x2020C000
@@ -77,8 +76,8 @@ PWM_CLK_ENAB = 1 << 4  # Enable clock.
 
 # Build control array from incoming bytes
 ints = [
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    # 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11
+    # 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x11
     # 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF
     # 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 ]
@@ -91,80 +90,71 @@ shared_mem = mu.create_phys_contig_int_view(256)
 
 # CBs that don't need dedicated space for source data
 CB_IDLE_WAIT = dma.ControlBlock3(shared_mem, 0)
-CB_DATA_WAIT1 = dma.ControlBlock3(shared_mem, 8)
-CB_DATA_WAIT2 = dma.ControlBlock3(shared_mem, 16)
-CB_DATA_WAIT3 = dma.ControlBlock3(shared_mem, 24)
-CB_DATA_WAIT4 = dma.ControlBlock3(shared_mem, 32)
-CB_ONE_WAIT1 = dma.ControlBlock3(shared_mem, 64)
-CB_UPD = dma.ControlBlock3(shared_mem, 72)  # Needs stride. Updates its own src addr and CB_DATA_WAIT's next CB addr
+CB_DATA_WAIT = dma.ControlBlock3(shared_mem, 8)
+CB_DATA_ONE_WAIT1 = dma.ControlBlock3(shared_mem, 16)
+CB_DATA_ONE_WAIT2 = dma.ControlBlock3(shared_mem, 24)
+CB_DATA_UPD = dma.ControlBlock3(shared_mem, 32)  # Updates its own src addr and CB_DATA_WAIT's next CB addr via stride
 
-# CBs that need dedicated space for data
-CB_IDLE_CLR = dma.ControlBlock3(shared_mem, 80)
-CB_DATA_CLR = dma.ControlBlock3(shared_mem, 96)
-CB_STOP = dma.ControlBlock3(shared_mem, 112)
-CB_ZERO_SET = dma.ControlBlock3(shared_mem, 128)
-CB_ONE_SET = dma.ControlBlock3(shared_mem, 144)
+# CBs that need dedicated space for source data
+CB_IDLE_CLR = dma.ControlBlock3(shared_mem, 48)
+CB_DATA_CLR = dma.ControlBlock3(shared_mem, 64)
+CB_DATA_STOP = dma.ControlBlock3(shared_mem, 80)
+CB_DATA_ZERO_SET = dma.ControlBlock3(shared_mem, 96)
+CB_DATA_ONE_SET = dma.ControlBlock3(shared_mem, 112)
 
 # Configure idle loop
-CB_IDLE_WAIT.set_transfer_information(PWM_DMA_FLAGS)
+CB_IDLE_WAIT.set_transfer_information(DMA_FLAGS_PWM)
 CB_IDLE_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 CB_IDLE_WAIT.set_next_cb(CB_IDLE_CLR.addr)
 
-CB_IDLE_CLR.set_transfer_information(DMA_FLAGS)
+CB_IDLE_CLR.set_transfer_information(DMA_FLAGS_DATA)
 CB_IDLE_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
 CB_IDLE_CLR.set_destination_addr(GPCLR0)
 CB_IDLE_CLR.set_next_cb(CB_IDLE_WAIT.addr)
 
 # Configure data loop
-CB_DATA_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
-CB_DATA_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_DATA_WAIT1.set_next_cb(CB_DATA_CLR.addr)
-
-CB_DATA_CLR.set_transfer_information(DMA_FLAGS)
-CB_DATA_CLR.write_word_to_source_data(0x0, 1 << 18)  # pin 18
+CB_DATA_CLR.set_transfer_information(DMA_FLAGS_DATA)
+CB_DATA_CLR.write_word_to_source_data(0, 1 << 18)  # pin 18
 CB_DATA_CLR.set_destination_addr(GPCLR0)
-CB_DATA_CLR.set_next_cb(CB_UPD.addr)
+CB_DATA_CLR.set_next_cb(CB_DATA_UPD.addr)
 
 src_stride = int(dma_data.view_len / 2 * 4)
-dest_stride = CB_DATA_WAIT4.addr + 0x14 - (CB_UPD.addr + 0x4)
-CB_UPD.set_transfer_information(DMA_FLAGS | DMA_TD_MODE)
-CB_UPD.set_source_addr(dma_data.base_addrs[0])
-CB_UPD.set_destination_addr(CB_UPD.addr + 0x4)
-CB_UPD.set_transfer_length_stride(4, 2)
-CB_UPD.set_stride(src_stride, dest_stride)
-CB_UPD.set_next_cb(CB_DATA_WAIT2.addr)
+dest_stride = CB_DATA_WAIT.addr + 0x14 - (CB_DATA_UPD.addr + 0x4)
+CB_DATA_UPD.set_transfer_information(DMA_FLAGS_DATA | DMA_TD_MODE)
+CB_DATA_UPD.set_source_addr(dma_data.base_addrs[0])
+CB_DATA_UPD.set_destination_addr(CB_DATA_UPD.addr + 0x4)
+CB_DATA_UPD.set_transfer_length_stride(4, 2)
+CB_DATA_UPD.set_stride(src_stride, dest_stride)
+CB_DATA_UPD.set_next_cb(CB_DATA_WAIT.addr)
 
-CB_DATA_WAIT2.set_transfer_information(PWM_DMA_FLAGS)
-CB_DATA_WAIT2.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_DATA_WAIT2.set_next_cb(CB_DATA_WAIT3.addr)
+CB_DATA_WAIT.set_transfer_information(DMA_FLAGS_PWM)
+CB_DATA_WAIT.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
 
-CB_DATA_WAIT3.set_transfer_information(PWM_DMA_FLAGS)
-CB_DATA_WAIT3.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_DATA_WAIT3.set_next_cb(CB_DATA_WAIT4.addr)
+CB_DATA_STOP.set_transfer_information(DMA_FLAGS_DATA)
+CB_DATA_STOP.write_word_to_source_data(0, CB_IDLE_WAIT.addr)
+CB_DATA_STOP.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
+CB_DATA_STOP.set_next_cb(CB_IDLE_WAIT.addr)
 
-CB_DATA_WAIT4.set_transfer_information(PWM_DMA_FLAGS)
-CB_DATA_WAIT4.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
+CB_DATA_ZERO_SET.set_transfer_information(DMA_FLAGS_DATA | DMA_WAITS_ZERO)
+CB_DATA_ZERO_SET.init_source_data(8)
+CB_DATA_ZERO_SET.write_word_to_source_data(1, 1 << 18)  # pin 18
+CB_DATA_ZERO_SET.set_destination_addr(GPSET0)
+CB_DATA_ZERO_SET.set_next_cb(CB_DATA_CLR.addr)
 
-CB_STOP.set_transfer_information(DMA_FLAGS)
-CB_STOP.write_word_to_source_data(0x0, CB_IDLE_WAIT.addr)
-CB_STOP.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
-CB_STOP.set_next_cb(CB_IDLE_WAIT.addr)
+CB_DATA_ONE_SET.set_transfer_information(DMA_FLAGS_DATA)
+CB_DATA_ONE_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
+CB_DATA_ONE_SET.set_destination_addr(GPSET0)
+CB_DATA_ONE_SET.set_next_cb(CB_DATA_ONE_WAIT1.addr)
 
-CB_ZERO_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
-CB_ZERO_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
-CB_ZERO_SET.set_destination_addr(GPSET0)
-CB_ZERO_SET.set_next_cb(CB_DATA_WAIT1.addr)
+CB_DATA_ONE_WAIT1.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS_ONE)
+CB_DATA_ONE_WAIT1.set_destination_addr(GPCLR0)
+CB_DATA_ONE_WAIT1.set_next_cb(CB_DATA_ONE_WAIT2.addr)
 
-CB_ONE_SET.set_transfer_information(DMA_FLAGS | DMA_WAITS)
-CB_ONE_SET.write_word_to_source_data(0, 1 << 18)  # pin 18
-CB_ONE_SET.set_destination_addr(GPSET0)
-CB_ONE_SET.set_next_cb(CB_ONE_WAIT1.addr)
+CB_DATA_ONE_WAIT2.set_transfer_information(DMA_FLAGS_WAIT | DMA_WAITS_ONE)
+CB_DATA_ONE_WAIT2.set_destination_addr(GPCLR0)
+CB_DATA_ONE_WAIT2.set_next_cb(CB_DATA_CLR.addr)
 
-CB_ONE_WAIT1.set_transfer_information(PWM_DMA_FLAGS)
-CB_ONE_WAIT1.set_destination_addr(PWM_BASE_BUS + PWM_FIFO)
-CB_ONE_WAIT1.set_next_cb(CB_DATA_WAIT1.addr)
-
-dma_data.set_cb_addrs(CB_ZERO_SET.addr, CB_ONE_SET.addr, CB_STOP.addr)
+dma_data.set_cb_addrs(CB_DATA_ZERO_SET.addr, CB_DATA_ONE_SET.addr, CB_DATA_STOP.addr)
 dma_data.populate_with_data(byte_arr)
 # dma_data.print_debug_info()
 
@@ -219,7 +209,7 @@ time.sleep(0.1)
 
 start = time.time()
 while time.time() - start < PLAY_SECONDS:
-    CB_IDLE_CLR.set_next_cb(CB_DATA_WAIT1.addr)
+    CB_IDLE_CLR.set_next_cb(CB_DATA_CLR.addr)
     time.sleep(.01)
 
 time.sleep(0.1)
