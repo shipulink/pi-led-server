@@ -4,6 +4,7 @@ import ctypes
 import mmap
 import os
 import random
+import struct
 
 # MMAP constants:
 MAP_NORERSERVE = 0x4000
@@ -53,7 +54,8 @@ def ctypes_alloc_aligned(size, alignment):
 
     # c_char is exactly one byte. In Python, multiplying a type T by N creates a new type that is an Array of N Ts.
     ctypes_raw_type = ctypes.c_char * buf_size
-    # Instantiate my Array<c_char> that sits in raw_memory. This is only in order to get the address of raw_memory via ctypes
+    # Instantiate my Array<c_char> that sits in raw_memory.
+    # This is only in order to get the address of raw_memory via ctypes.
     ctypes_raw_memory = ctypes_raw_type.from_buffer(raw_memory)
 
     raw_address = ctypes.addressof(ctypes_raw_memory)
@@ -100,8 +102,22 @@ def create_phys_contig_int_view(view_len):
     raise Exception(
         "Could not create a byte memoryview of length {} that is contiguous in physical memory.".format(view_len))
 
+
 def create_phys_contig_int_views(view_len, num_views):
     mvs = []
     while len(mvs) < num_views:
         mvs.append(create_phys_contig_int_view(view_len))
     return mvs
+
+
+def print_byte_array_as_hex_words(byte_arr, num_words, byte_offset):
+    ints = []
+    for i in range(num_words):
+        start = byte_offset + i * 4
+        ints.append(struct.unpack("<L", byte_arr[start: start + 4]))
+    return str(':'.join(format(x[0], '08x') for x in ints))
+
+
+def mmap_dev_mem(addr):
+    with open("/dev/mem", "r+b", buffering=0) as f:
+        return mmap.mmap(f.fileno(), 4096, MMAP_FLAGS, MMAP_PROT, offset=addr)
