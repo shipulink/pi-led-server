@@ -1,6 +1,6 @@
 import ctypes
-
 import mmap
+import time
 
 import app.memory_utils as mu
 
@@ -223,6 +223,8 @@ def activate_channel_with_cb(channel, cb_addr, do_start=True):
             mu.write_word_to_byte_array(dma_mem, ch_dma_cb_ad, cb_addr)
             if do_start:
                 mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_ACTIVE)
+
+    time.sleep(0.1)
 
 
 def build_linked_cb_list(length):
