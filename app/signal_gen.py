@@ -3,7 +3,7 @@ import time
 
 import app.dma as dma
 import app.gpio as gpio
-import app.led_frame_data_2 as fd
+import app.led_frame_data as fd
 import app.memory_utils as mu
 import app.pwm as pwm
 
