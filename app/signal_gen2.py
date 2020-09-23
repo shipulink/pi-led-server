@@ -45,9 +45,7 @@ dma_data.populate_with_data(byte_arr, GPIO_PIN)
 # statically be set. The fourth register will be used to optionally clear gpio pins to create a "zero" square wave.
 
 with mu.mmap_dev_mem(MS_BASE) as m:
-    print(mu.print_byte_array_as_hex_words(m, 4, MS_MBOX_REG_OFFSET))
     mu.write_word_to_byte_array(m, MS_MBOX_REG_OFFSET, 1 << GPIO_INFO.flip_shift)
-    print(mu.print_byte_array_as_hex_words(m, 4, MS_MBOX_REG_OFFSET))
 
 # Allocate enough memory for all the CBs.
 shared_mem = mu.create_phys_contig_int_view(384)
@@ -140,6 +138,6 @@ dma.activate_channel_with_cb(DMA_CH, CB_IDLE_WAIT.addr)
 start = time.time()
 while time.time() - start < PLAY_SECONDS:
     CB_IDLE_CLR.set_next_cb(CB_DATA_ADVANCE.addr)
-    time.sleep(.1)
+    time.sleep(.01)
 
 pwm.stop_pwm(DMA_CH, PWM_CLK_SRC)
