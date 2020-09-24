@@ -23,7 +23,7 @@ GPFSEL_REG_OFFSETS = [
 
 class GpioInfo:
     def __init__(self, pin):
-        if pin < 0 | pin > 53:
+        if pin < 0 or pin > 53:
             raise Exception("Invalid gpio pin index: {}".format(pin))
 
         if pin <= 31:

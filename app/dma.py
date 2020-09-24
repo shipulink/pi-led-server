@@ -119,7 +119,7 @@ class ControlBlock:
 
 
 def activate_channel_with_cb(channel, cb_addr, do_start=True):
-    if channel < 0 | channel > 15:
+    if channel < 0 or channel > 15:
         raise Exception("Invalid channel index: {}".format(channel))
 
     if channel < 15:
