@@ -17,7 +17,7 @@ GPIO_INFO_PIN18 = gpio.GpioInfo(18)
 GPIO_INFO_PIN15 = gpio.GpioInfo(15)
 DMA_WAITS = 27 << 21
 
-DMA_FLAGS_PWM = dma.DMA_NO_WIDE_BURSTS | dma.DMA_SRC_IGNORE | dma.DMA_PERMAP | dma.DMA_DEST_DREQ
+DMA_FLAGS_PWM = dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_SRC_IGNORE | dma.DMA_TI_PERMAP | dma.DMA_TI_DEST_DREQ
 
 MS_BASE = 0x20000000
 MS_BASE_BUS = 0x7e000000
@@ -77,7 +77,7 @@ CB_IDLE_WAIT.set_transfer_information(DMA_FLAGS_PWM)
 CB_IDLE_WAIT.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
 CB_IDLE_WAIT.set_next_cb(CB_IDLE_CLR.addr)
 
-CB_IDLE_CLR.set_transfer_information(dma.DMA_SRC_INC | dma.DMA_DEST_INC)
+CB_IDLE_CLR.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_IDLE_CLR.set_transfer_length(8)
 CB_IDLE_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_IDLE_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPCLR0_REG_OFFSET)
@@ -87,19 +87,19 @@ CB_IDLE_CLR.set_next_cb(CB_IDLE_WAIT.addr)
 cb_data_advance_src_addr = CB_DATA_ADVANCE.addr + 0x4
 src_stride = 4
 dest_stride = 48
-CB_DATA_ADVANCE.set_transfer_information(dma.DMA_TD_MODE)
+CB_DATA_ADVANCE.set_transfer_information(dma.DMA_TI_TD_MODE)
 CB_DATA_ADVANCE.set_source_addr(dma_data.start_address)
 CB_DATA_ADVANCE.set_destination_addr(cb_data_advance_src_addr)
 CB_DATA_ADVANCE.set_transfer_length_stride(4, 3)
 CB_DATA_ADVANCE.set_stride(src_stride, dest_stride)
 CB_DATA_ADVANCE.set_next_cb(CB_DATA_UPD.addr)
 
-CB_DATA_UPD.set_transfer_information(dma.DMA_SRC_INC | dma.DMA_DEST_INC)
+CB_DATA_UPD.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_UPD.set_transfer_length(8)
 CB_DATA_UPD.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # overwrite MS_MBOX_3,4 with GPIO CLR data
 CB_DATA_UPD.set_next_cb(CB_DATA_SET_CLR.addr)
 
-CB_DATA_SET_CLR.set_transfer_information(dma.DMA_NO_WIDE_BURSTS | dma.DMA_DEST_INC | dma.DMA_SRC_INC | DMA_WAITS)
+CB_DATA_SET_CLR.set_transfer_information(dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_DEST_INC | dma.DMA_TI_SRC_INC | DMA_WAITS)
 CB_DATA_SET_CLR.set_transfer_length(20)
 CB_DATA_SET_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_SET_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPSET0_REG_OFFSET)
@@ -109,7 +109,7 @@ CB_DATA_WAIT1.set_transfer_information(DMA_FLAGS_PWM)
 CB_DATA_WAIT1.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
 CB_DATA_WAIT1.set_next_cb(CB_DATA_CLR.addr)
 
-CB_DATA_CLR.set_transfer_information(dma.DMA_NO_WIDE_BURSTS | dma.DMA_SRC_INC | dma.DMA_DEST_INC)
+CB_DATA_CLR.set_transfer_information(dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_CLR.set_transfer_length(8)
 CB_DATA_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPCLR0_REG_OFFSET)

@@ -3,38 +3,37 @@ import time
 
 import app.memory_utils as mu
 
-# DMA addresses and offsets:
-DMA_BASE_BUS = 0x7E007000
+# DMA physical addresses:
 DMA_BASE = 0x20007000
 DMA_BASE_CH15 = 0x20E05000
-DMA_GLOBAL_ENABLE = 0xFF0
+
+# DMA register offsets (from the base address of a channel)
 DMA_CS = 0x0
 DMA_CB_AD = 0x4
 DMA_TI = 0x8
 DMA_DEBUG = 0x20
 
-# DMA constants
-DMA_RESET = 1 << 31
-DMA_INT = 1 << 2
-DMA_END = 1 << 1
-DMA_WAIT_FOR_OUTSTANDING_WRITES = 1 << 28
-DMA_PANIC_PRIORITY = 8 << 20
-DMA_PRIORITY = 8 << 16
-DMA_DEBUG_CLR_ERRORS = 0b111  # Clear Read Error, FIFO Error, Read Last Not Set Error
-DMA_ACTIVE = 1
+# DMA CS register bits
+DMA_CS_RESET = 1 << 31
+DMA_CS_ACTIVE = 1 << 0
+DMA_CS_END = 1 << 1
+DMA_CS_INT = 1 << 2
+DMA_CS_PRIORITY = 8 << 16
+DMA_CS_PANIC_PRIORITY = 8 << 20
+DMA_CS_WAIT_FOR_OUTSTANDING_WRITES = 1 << 28
 
-DMA_TD_MODE = 1 << 1
-DMA_WAIT_RESP = 1 << 3
-DMA_DEST_INC = 1 << 4
-DMA_DEST_WIDTH = 1 << 5
-DMA_DEST_DREQ = 1 << 6
-DMA_DEST_IGNORE = 1 << 7
-DMA_SRC_INC = 1 << 8
-DMA_SRC_WIDTH = 1 << 9
-DMA_SRC_IGNORE = 1 << 11
-DMA_WAITS = 31 << 21
-DMA_NO_WIDE_BURSTS = 1 << 26
-DMA_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
+# DMA DEBUG register bits
+DMA_DEBUG_CLR_ERRORS = 0b111  # Clear Read Error, FIFO Error, Read Last Not Set Error
+
+# DMA TI register bits
+DMA_TI_TD_MODE = 1 << 1
+DMA_TI_WAIT_RESP = 1 << 3
+DMA_TI_DEST_INC = 1 << 4
+DMA_TI_DEST_DREQ = 1 << 6
+DMA_TI_SRC_INC = 1 << 8
+DMA_TI_SRC_IGNORE = 1 << 11
+DMA_TI_NO_WIDE_BURSTS = 1 << 26
+DMA_TI_PERMAP = 5 << 16  # 5 = PWM, 2 = PCM
 
 
 class ControlBlock:
@@ -133,15 +132,15 @@ def activate_channel_with_cb(channel, cb_addr, do_start=True):
 
     with open("/dev/mem", "r+b", buffering=0) as f:
         with mmap.mmap(f.fileno(), 4096, mu.MMAP_FLAGS, mu.MMAP_PROT, offset=ch_base) as dma_mem:
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_RESET)
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_INT | DMA_END)
+            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_RESET)
+            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_INT | DMA_CS_END)
             mu.write_word_to_byte_array(dma_mem, ch_dma_debug, DMA_DEBUG_CLR_ERRORS)
             mu.write_word_to_byte_array(dma_mem, ch_dma_cs,
-                                        DMA_WAIT_FOR_OUTSTANDING_WRITES |
-                                        DMA_PANIC_PRIORITY |
-                                        DMA_PRIORITY)
+                                        DMA_CS_WAIT_FOR_OUTSTANDING_WRITES |
+                                        DMA_CS_PANIC_PRIORITY |
+                                        DMA_CS_PRIORITY)
             mu.write_word_to_byte_array(dma_mem, ch_dma_cb_ad, cb_addr)
             if do_start:
-                mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_ACTIVE)
+                mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_ACTIVE)
 
     time.sleep(0.1)
