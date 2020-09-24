@@ -1,11 +1,10 @@
-import mmap
 import time
 
 import app.memory_utils as mu
 
 # DMA physical addresses:
-DMA_BASE = 0x20007000
-DMA_BASE_CH15 = 0x20E05000
+DMA_BASE_PHYS = 0x20007000
+DMA_BASE_CH15_PHYS = 0x20E05000
 
 # DMA register offsets (from the base address of a channel)
 DMA_CS = 0x0
@@ -122,25 +121,24 @@ def activate_channel_with_cb(channel, cb_addr, do_start=True):
         raise Exception("Invalid channel index: {}".format(channel))
 
     if channel < 15:
-        ch_base = DMA_BASE
+        ch_base = DMA_BASE_PHYS
     else:
-        ch_base = DMA_BASE_CH15
+        ch_base = DMA_BASE_CH15_PHYS
 
     ch_dma_cs = 0x100 * channel + DMA_CS
     ch_dma_debug = 0x100 * channel + DMA_DEBUG
     ch_dma_cb_ad = 0x100 * channel + DMA_CB_AD
 
-    with open("/dev/mem", "r+b", buffering=0) as f:
-        with mmap.mmap(f.fileno(), 4096, mu.MMAP_FLAGS, mu.MMAP_PROT, offset=ch_base) as dma_mem:
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_RESET)
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_INT | DMA_CS_END)
-            mu.write_word_to_byte_array(dma_mem, ch_dma_debug, DMA_DEBUG_CLR_ERRORS)
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cs,
-                                        DMA_CS_WAIT_FOR_OUTSTANDING_WRITES |
-                                        DMA_CS_PANIC_PRIORITY |
-                                        DMA_CS_PRIORITY)
-            mu.write_word_to_byte_array(dma_mem, ch_dma_cb_ad, cb_addr)
-            if do_start:
-                mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_ACTIVE)
+    with mu.mmap_dev_mem(ch_base) as dma_mem:
+        mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_RESET)
+        mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_INT | DMA_CS_END)
+        mu.write_word_to_byte_array(dma_mem, ch_dma_debug, DMA_DEBUG_CLR_ERRORS)
+        mu.write_word_to_byte_array(dma_mem, ch_dma_cs,
+                                    DMA_CS_WAIT_FOR_OUTSTANDING_WRITES |
+                                    DMA_CS_PANIC_PRIORITY |
+                                    DMA_CS_PRIORITY)
+        mu.write_word_to_byte_array(dma_mem, ch_dma_cb_ad, cb_addr)
+        if do_start:
+            mu.write_word_to_byte_array(dma_mem, ch_dma_cs, DMA_CS_ACTIVE)
 
     time.sleep(0.1)
