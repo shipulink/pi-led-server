@@ -63,13 +63,12 @@ CB_IDLE_WAIT = dma.ControlBlock()
 CB_IDLE_CLR = dma.ControlBlock()
 
 CB_DATA_ADVANCE = dma.ControlBlock(shared_mem, 0)  # Advances its own SRC_ADDR and CB_DATA_UPD's SRC_ADDR
-CB_DATA_UPD = dma.ControlBlock(shared_mem, 8)  # Writes the next bit to be copied to GPIO into MS_MBOX
-CB_DATA_ADVANCE2 = dma.ControlBlock(shared_mem, 16)  # Advances its own SRC_ADDR and NEXT_CB_ADDR of CB_DATA_WAIT2
+CB_DATA_UPD = dma.ControlBlock(shared_mem, 24)  # Writes the next bit to be copied to GPIO into MS_MBOX
 
 CB_DATA_SET_CLR = dma.ControlBlock()
 CB_DATA_WAIT1 = dma.ControlBlock()
 CB_DATA_CLR = dma.ControlBlock()
-CB_DATA_WAIT2 = dma.ControlBlock(shared_mem, 24)  # Waits and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
+CB_DATA_WAIT2 = dma.ControlBlock(shared_mem, 8)  # Waits and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
 
 CB_PAUSE = dma.ControlBlock()  # Resets CB_IDLE_CLR's NEXT_CB_ADDR to get into the idle CB loop
 
@@ -86,31 +85,19 @@ CB_IDLE_CLR.set_next_cb(CB_IDLE_WAIT.addr)
 
 # Configure data loop
 cb_data_advance_src_addr = CB_DATA_ADVANCE.addr + 0x4
-cb_data_upd_src_addr = CB_DATA_UPD.addr + 0x4
 src_stride = 4
-dest_stride = cb_data_upd_src_addr - cb_data_advance_src_addr
+dest_stride = 48
 CB_DATA_ADVANCE.set_transfer_information(dma.DMA_TD_MODE)
 CB_DATA_ADVANCE.set_source_addr(dma_data.start_address)
 CB_DATA_ADVANCE.set_destination_addr(cb_data_advance_src_addr)
-CB_DATA_ADVANCE.set_transfer_length_stride(4, 2)
+CB_DATA_ADVANCE.set_transfer_length_stride(4, 3)
 CB_DATA_ADVANCE.set_stride(src_stride, dest_stride)
 CB_DATA_ADVANCE.set_next_cb(CB_DATA_UPD.addr)
 
 CB_DATA_UPD.set_transfer_information(dma.DMA_SRC_INC | dma.DMA_DEST_INC)
 CB_DATA_UPD.set_transfer_length(8)
 CB_DATA_UPD.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # overwrite MS_MBOX_3,4 with GPIO CLR data
-CB_DATA_UPD.set_next_cb(CB_DATA_ADVANCE2.addr)
-
-cb_data_advance2_src_addr = CB_DATA_ADVANCE2.addr + 0x4
-cb_data_wait2_next_cb_addr = CB_DATA_WAIT2.addr + 0x14
-src_stride2 = 8
-dest_stride2 = cb_data_wait2_next_cb_addr - cb_data_advance2_src_addr
-CB_DATA_ADVANCE2.set_transfer_information(dma.DMA_TD_MODE)
-CB_DATA_ADVANCE2.set_source_addr(dma_data.start_address)
-CB_DATA_ADVANCE2.set_destination_addr(cb_data_advance2_src_addr)
-CB_DATA_ADVANCE2.set_transfer_length_stride(4, 2)
-CB_DATA_ADVANCE2.set_stride(src_stride2, dest_stride2)
-CB_DATA_ADVANCE2.set_next_cb(CB_DATA_SET_CLR.addr)
+CB_DATA_UPD.set_next_cb(CB_DATA_SET_CLR.addr)
 
 CB_DATA_SET_CLR.set_transfer_information(dma.DMA_NO_WIDE_BURSTS | dma.DMA_DEST_INC | dma.DMA_SRC_INC | DMA_WAITS)
 CB_DATA_SET_CLR.set_transfer_length(20)

@@ -22,7 +22,7 @@ class LedDmaFrameData2:
         while i < self.num_bits:
             if i < self.num_bits - 1:
                 self.bits[i][0] = mu.get_mem_view_phys_addr_info(self.bits[i + 1]).p_addr
-            self.bits[i][1] = mu.get_mem_view_phys_addr_info(self.gpio_data[i]).p_addr
+            self.bits[i][2] = mu.get_mem_view_phys_addr_info(self.gpio_data[i]).p_addr
             i += 1
 
         # Set the first slot of the last 3-int array to the address of the first one,
@@ -39,9 +39,9 @@ class LedDmaFrameData2:
         # to get out of the data loop and into the idle loop.
         i = 0
         while i < self.num_bits - 1:
-            self.bits[i][2] = data_cb_addr
+            self.bits[i][1] = data_cb_addr
             i += 1
-        self.bits[self.num_bits - 1][2] = self.stop_cb_addr
+        self.bits[self.num_bits - 1][1] = self.stop_cb_addr
 
     def populate_with_data(self, data, gpio_info):
         num_bytes = self.num_leds * 3
