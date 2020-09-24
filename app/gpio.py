@@ -29,11 +29,13 @@ class GpioInfo:
         if pin <= 31:
             self.set_reg_offset = GPSET0_REG_OFFSET
             self.clr_reg_offset = GPCLR0_REG_OFFSET
-            self.flip_shift = pin
+            self.pin_flip_bit_shift = pin
+            self.set_clr_register_index = 0
         else:
             self.set_reg_offset = GPSET1_REG_OFFSET
             self.clr_reg_offset = GPCLR1_REG_OFFSET
-            self.flip_shift = pin - 32
+            self.pin_flip_bit_shift = pin - 32
+            self.set_clr_register_index = 0
 
         gp_f_sel_ind = int(pin / 10)
         self.gp_fsel_reg_offset = GPFSEL_REG_OFFSETS[gp_f_sel_ind]

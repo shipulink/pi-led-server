@@ -1,7 +1,6 @@
 import app.memory_utils as mu
 
 
-# TODO: Make this setup work for GPIO pins that are flipped via GPCLR1/GPSET1 registers (not just GPCLR0/GPSET0)
 class LedDmaFrameData2:
     def __init__(self, num_leds):
         self.data_cb_addr = None
@@ -10,8 +9,8 @@ class LedDmaFrameData2:
         self.num_words_per_bit = 3
         self.num_bits = self.num_leds * 3 * 8  # 3 bytes per LED (RGB), 8 bits per byte
 
-        # Create an int array to hold GPIO CLR register data for each bit.
-        self.gpio_data = mu.create_int_mem_view(self.num_bits)
+        # Create an array of 2-word memory views to hold GPIO CLR register data for each bit, and both CLR registers.
+        self.gpio_data = mu.create_phys_contig_int_views(2, self.num_bits)
 
         # For every bit, create an int array of size 3. Each int will hold a physical memory address
         self.bits = mu.create_phys_contig_int_views(self.num_words_per_bit, self.num_bits)
@@ -23,7 +22,7 @@ class LedDmaFrameData2:
         while i < self.num_bits:
             if i < self.num_bits - 1:
                 self.bits[i][0] = mu.get_mem_view_phys_addr_info(self.bits[i + 1]).p_addr
-            self.bits[i][1] = mu.get_mem_view_phys_addr_info(self.gpio_data[i:]).p_addr
+            self.bits[i][1] = mu.get_mem_view_phys_addr_info(self.gpio_data[i]).p_addr
             i += 1
 
         # Set the first slot of the last 3-int array to the address of the first one,
@@ -44,8 +43,7 @@ class LedDmaFrameData2:
             i += 1
         self.bits[self.num_bits - 1][2] = self.stop_cb_addr
 
-    # TODO: make this work for multiple pins
-    def populate_with_data(self, data, pin):
+    def populate_with_data(self, data, gpio_info):
         num_bytes = self.num_leds * 3
         if len(data) != num_bytes:
             raise Exception("This LedFrameData instance was initialized for exactly {} bytes of data. "
@@ -58,6 +56,6 @@ class LedDmaFrameData2:
             while j < 8:
                 bit_ind = 8 * i + j
                 if byte & (128 >> j) == 0:
-                    self.gpio_data[bit_ind] = 1 << pin
+                    self.gpio_data[bit_ind][gpio_info.set_clr_register_index] |= 1 << gpio_info.pin_flip_bit_shift
                 j += 1
             i += 1
