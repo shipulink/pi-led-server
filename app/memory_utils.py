@@ -71,10 +71,6 @@ def write_word_to_byte_array(byte_array, address, word):
     return
 
 
-def create_int_mem_view(length):
-    return memoryview(array.array('L', [0] * length))
-
-
 def check_int_mem_view_physical_contiguous(mv):
     num_words = len(mv)
     num_bytes = num_words * 4
@@ -108,7 +104,7 @@ def create_aligned_phys_contig_int_view(view_len, byte_alignment):
 def create_phys_contig_int_view(view_len):
     fails = 0
     while fails < 5:
-        mv = create_int_mem_view(view_len)
+        mv = memoryview(array.array('L', [0] * view_len))
         if check_int_mem_view_physical_contiguous(mv):
             return mv
         else:
@@ -124,7 +120,7 @@ def create_phys_contig_int_views(view_len, num_views):
     return mvs
 
 
-def print_byte_array_as_hex_words(byte_arr, num_words, byte_offset):
+def convert_byte_array_to_hex_words_string(byte_arr, num_words, byte_offset):
     ints = []
     for i in range(num_words):
         start = byte_offset + i * 4

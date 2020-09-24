@@ -49,11 +49,9 @@ dma_data.populate_with_data(byte_arr2, GPIO_INFO_PIN18)
 # statically be set. The fourth register will be used to optionally clear gpio pins to create a "zero" square wave.
 
 with mu.mmap_dev_mem(MS_BASE) as m:
-    print(mu.print_byte_array_as_hex_words(m, 2, MS_MBOX_REG_OFFSET))
     mu.write_word_to_byte_array(
         m, MS_MBOX_REG_OFFSET + GPIO_INFO_PIN18.set_clr_register_index,
         1 << GPIO_INFO_PIN18.pin_flip_bit_shift | 1 << GPIO_INFO_PIN15.pin_flip_bit_shift)
-    print(mu.print_byte_array_as_hex_words(m, 2, MS_MBOX_REG_OFFSET))
 
 # Allocate enough memory for all the CBs.
 shared_mem = mu.create_aligned_phys_contig_int_view(32, 32)
