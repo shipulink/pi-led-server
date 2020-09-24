@@ -46,8 +46,16 @@ CLK_SRC_RATES = {
     CLK_SRC_PLLD: 500000000
 }
 
+__allowed_clk_src_list = {CLK_SRC_OSCILLATOR, CLK_SRC_PLLC, CLK_SRC_PLLD}
+
 
 def configure_and_start_pwm(dma_ch, pwm_clk_src, pwm_clk_div_int, pwm_clk_div_frac, pwm_cycles):
+    if pwm_clk_src not in __allowed_clk_src_list:
+        raise Exception("{} is not a valid clock source.".format(pwm_clk_src))
+
+    if pwm_clk_div_int < 2:
+        raise Exception("Clock integer divider must be 2 or greater.")
+
     pwm_period_ns = 1000000000 / CLK_SRC_RATES[pwm_clk_src] * ((pwm_clk_div_int + pwm_clk_div_frac / 4096) * pwm_cycles)
     print("Starting PWM with a period of " + str(pwm_period_ns) + " ns.")
 
@@ -80,6 +88,9 @@ def configure_and_start_pwm(dma_ch, pwm_clk_src, pwm_clk_div_int, pwm_clk_div_fr
 
 
 def stop_pwm(dma_ch, pwm_clk_src):
+    if pwm_clk_src not in __allowed_clk_src_list:
+        raise Exception("{} is not a valid clock source.".format(pwm_clk_src))
+
     # Reset PWM
     with mu.mmap_dev_mem(PWM_BASE_PHYS) as m:
         mu.write_word_to_byte_array(m, PWM_CTL, PWM_CTL_CLRF)  # Clear FIFO
