@@ -51,7 +51,7 @@ dma_data.populate_with_data(byte_arr2, GPIO_INFO_PIN18)
 with mu.mmap_dev_mem(MS_BASE) as m:
     mu.write_word_to_byte_array(
         m, MS_MBOX_REG_OFFSET + GPIO_INFO_PIN18.set_clr_register_index,
-        1 << GPIO_INFO_PIN18.pin_flip_bit_shift | 1 << GPIO_INFO_PIN15.pin_flip_bit_shift)
+           1 << GPIO_INFO_PIN18.pin_flip_bit_shift | 1 << GPIO_INFO_PIN15.pin_flip_bit_shift)
 
 # Allocate enough memory for all the CBs.
 shared_mem = mu.create_aligned_phys_contig_int_view(32, 32)
@@ -97,7 +97,8 @@ CB_DATA_UPD.set_transfer_length(8)
 CB_DATA_UPD.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # overwrite MS_MBOX_3,4 with GPIO CLR data
 CB_DATA_UPD.set_next_cb(CB_DATA_SET_CLR.addr)
 
-CB_DATA_SET_CLR.set_transfer_information(dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_DEST_INC | dma.DMA_TI_SRC_INC | DMA_WAITS)
+CB_DATA_SET_CLR.set_transfer_information(
+    dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_DEST_INC | dma.DMA_TI_SRC_INC | DMA_WAITS)
 CB_DATA_SET_CLR.set_transfer_length(20)
 CB_DATA_SET_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_SET_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPSET0)
