@@ -1,7 +1,7 @@
 import array
 import ctypes
-
 import mmap
+
 import os
 import random
 import struct
@@ -89,6 +89,21 @@ def check_int_mem_view_physical_contiguous(mv):
             is_contiguous = result_int == mv[num_words - 1]
             mv[num_words - 1] = original_int_val
             return is_contiguous
+
+
+def create_aligned_phys_contig_int_view(view_len, byte_alignment):
+    if byte_alignment % 4 != 0:
+        raise Exception("Byte alignment of int view must be divisible by 4.")
+
+    word_alignment = int(byte_alignment / 4)
+    padded_length = view_len + word_alignment
+
+    mv = create_phys_contig_int_view(padded_length)
+    p_addr = get_mem_view_phys_addr_info(mv).p_addr
+    remaining_bytes = p_addr % byte_alignment
+    remaining_words = int(remaining_bytes / 4)
+    words_to_next_aligned_addr = word_alignment - remaining_words
+    return mv[words_to_next_aligned_addr: padded_length - remaining_words]
 
 
 def create_phys_contig_int_view(view_len):

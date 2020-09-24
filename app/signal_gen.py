@@ -56,7 +56,7 @@ with mu.mmap_dev_mem(MS_BASE) as m:
     print(mu.print_byte_array_as_hex_words(m, 2, MS_MBOX_REG_OFFSET))
 
 # Allocate enough memory for all the CBs.
-shared_mem = mu.create_phys_contig_int_view(384)
+shared_mem = mu.create_aligned_phys_contig_int_view(384, 32)
 
 # CBs
 CB_IDLE_WAIT = dma.ControlBlock3(shared_mem, 0)

@@ -92,42 +92,49 @@ class ControlBlock3:
 
     DATA_OFFSET = 0x20
 
-    def __init__(self, shared_mem_view, offset):
+    def __init__(self, shared_mem_view, word_offset):
         self.shared_mem = shared_mem_view
+        self.word_offset = word_offset
         mv_phys_addr = mu.get_mem_view_phys_addr_info(self.shared_mem).p_addr
-        self.offset = int(((offset * 4) + 32 - mv_phys_addr % 32) / 4)
-        self.addr = mv_phys_addr + self.offset * 4
+
+        if word_offset % 8 != 0:
+            raise Exception("CBs must be 32-bit (8-word) aligned.")
+
+        if mv_phys_addr % 32 != 0:
+            raise Exception("CB memory view must be 32-byte aligned.")
+
+        self.addr = mv_phys_addr + self.word_offset * 4
         self.data_addr = self.addr + self.DATA_OFFSET
         self.data_len = 4
-        self.shared_mem[self.offset + self.CB_SRC_ADDR] = self.data_addr
-        self.shared_mem[self.offset + self.CB_TXFR_LEN] = self.data_len
+        self.shared_mem[self.word_offset + self.CB_SRC_ADDR] = self.data_addr
+        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = self.data_len
 
     def set_transfer_information(self, transfer_information):
-        self.shared_mem[self.offset + self.CB_TI] = transfer_information
+        self.shared_mem[self.word_offset + self.CB_TI] = transfer_information
 
     def set_destination_addr(self, dest_addr):
-        self.shared_mem[self.offset + self.CB_DEST_ADDR] = dest_addr
+        self.shared_mem[self.word_offset + self.CB_DEST_ADDR] = dest_addr
 
     def set_source_addr(self, src_addr):
-        self.shared_mem[self.offset + self.CB_SRC_ADDR] = src_addr
+        self.shared_mem[self.word_offset + self.CB_SRC_ADDR] = src_addr
 
     # size is in bytes
     def init_source_data(self, size):
         self.data_len = size
-        self.shared_mem[self.offset + self.CB_TXFR_LEN] = self.data_len
+        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = self.data_len
 
     def write_word_to_source_data(self, offset, word):
-        self.shared_mem[self.offset + int(self.DATA_OFFSET / 4) + offset] = word
+        self.shared_mem[self.word_offset + int(self.DATA_OFFSET / 4) + offset] = word
 
     def set_transfer_length(self, length):
         self.data_len = length
-        self.shared_mem[self.offset + self.CB_TXFR_LEN] = length
+        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = length
 
     # x = transfer length in bytes
     # y = number of transfers
     def set_transfer_length_stride(self, x, y):
         self.data_len = x * y
-        self.shared_mem[self.offset + self.CB_TXFR_LEN] = x | (y - 1) << 16
+        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = x | (y - 1) << 16
 
     def set_stride(self, src, dest):
         if src < 0:
@@ -136,10 +143,10 @@ class ControlBlock3:
         if dest < 0:
             dest = dest & 0xFFFF
 
-        self.shared_mem[self.offset + self.CB_STRIDE] = src | dest << 16
+        self.shared_mem[self.word_offset + self.CB_STRIDE] = src | dest << 16
 
     def set_next_cb(self, next_cb_addr):
-        self.shared_mem[self.offset + self.CB_NEXT] = next_cb_addr
+        self.shared_mem[self.word_offset + self.CB_NEXT] = next_cb_addr
 
 
 def activate_channel_with_cb(channel, cb_addr, do_start=True):
