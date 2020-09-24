@@ -56,22 +56,22 @@ with mu.mmap_dev_mem(MS_BASE) as m:
     print(mu.print_byte_array_as_hex_words(m, 2, MS_MBOX_REG_OFFSET))
 
 # Allocate enough memory for all the CBs.
-shared_mem = mu.create_aligned_phys_contig_int_view(384, 32)
+shared_mem = mu.create_aligned_phys_contig_int_view(32, 32)
 
 # CBs
-CB_IDLE_WAIT = dma.ControlBlock(shared_mem, 0)
-CB_IDLE_CLR = dma.ControlBlock(shared_mem, 8)
+CB_IDLE_WAIT = dma.ControlBlock()
+CB_IDLE_CLR = dma.ControlBlock()
 
-CB_DATA_ADVANCE = dma.ControlBlock(shared_mem, 16)  # Advances its own SRC_ADDR and CB_DATA_UPD's SRC_ADDR
-CB_DATA_UPD = dma.ControlBlock(shared_mem, 24)  # Writes the next bit to be copied to GPIO into MS_MBOX
-CB_DATA_ADVANCE2 = dma.ControlBlock(shared_mem, 32)  # Advances its own SRC_ADDR and NEXT_CB_ADDR of CB_DATA_WAIT2
+CB_DATA_ADVANCE = dma.ControlBlock(shared_mem, 0)  # Advances its own SRC_ADDR and CB_DATA_UPD's SRC_ADDR
+CB_DATA_UPD = dma.ControlBlock(shared_mem, 8)  # Writes the next bit to be copied to GPIO into MS_MBOX
+CB_DATA_ADVANCE2 = dma.ControlBlock(shared_mem, 16)  # Advances its own SRC_ADDR and NEXT_CB_ADDR of CB_DATA_WAIT2
 
-CB_DATA_SET_CLR = dma.ControlBlock(shared_mem, 40)
-CB_DATA_WAIT1 = dma.ControlBlock(shared_mem, 48)
-CB_DATA_CLR = dma.ControlBlock(shared_mem, 56)
-CB_DATA_WAIT2 = dma.ControlBlock(shared_mem, 64)  # Waits and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
+CB_DATA_SET_CLR = dma.ControlBlock()
+CB_DATA_WAIT1 = dma.ControlBlock()
+CB_DATA_CLR = dma.ControlBlock()
+CB_DATA_WAIT2 = dma.ControlBlock(shared_mem, 24)  # Waits and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
 
-CB_PAUSE = dma.ControlBlock(shared_mem, 72)  # Resets CB_IDLE_CLR's NEXT_CB_ADDR to get into the idle CB loop
+CB_PAUSE = dma.ControlBlock()  # Resets CB_IDLE_CLR's NEXT_CB_ADDR to get into the idle CB loop
 
 # Configure idle loop
 CB_IDLE_WAIT.set_transfer_information(DMA_FLAGS_PWM)
