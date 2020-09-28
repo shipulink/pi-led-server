@@ -65,14 +65,13 @@ def configure_and_start_pwm(dma_ch, pwm_clk_src, pwm_clk_div_int, pwm_clk_div_fr
         dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_WAIT_RESP | dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 
     # Stop and configure PWM clock
-    clk_cb.init_source_data(8)
+    clk_cb.set_transfer_length(8)
     clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | pwm_clk_src)
     clk_cb.write_word_to_source_data(PWM_CLK_DIV, PWM_CLK_PWD | pwm_clk_div_frac | pwm_clk_div_int << 12)
     dma.activate_channel_with_cb(dma_ch, clk_cb.addr)
     time.sleep(0.1)
 
     # Start PWM clock
-    clk_cb.init_source_data(4)
     clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | pwm_clk_src | PWM_CLK_ENAB)
     dma.activate_channel_with_cb(dma_ch, clk_cb.addr)
     time.sleep(0.1)
@@ -103,7 +102,6 @@ def stop_pwm(dma_ch, pwm_clk_src):
     clk_cb.set_destination_addr(PWM_CLK_BASE_BUS)
     clk_cb.set_transfer_information(
         dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_WAIT_RESP | dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
-    clk_cb.init_source_data(4)
     clk_cb.write_word_to_source_data(PWM_CLK_CTL, PWM_CLK_PWD | pwm_clk_src)
     dma.activate_channel_with_cb(dma_ch, clk_cb.addr)
     time.sleep(0.1)

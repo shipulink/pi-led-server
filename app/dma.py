@@ -85,14 +85,6 @@ class ControlBlock:
     def set_source_addr(self, src_addr):
         self.shared_mem[self.word_offset + self.CB_SRC_ADDR] = src_addr
 
-    # size is in bytes
-    def init_source_data(self, size):
-        self.data_len = size
-        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = self.data_len
-
-    def write_word_to_source_data(self, offset, word):
-        self.shared_mem[self.word_offset + int(self.DATA_OFFSET / 4) + offset] = word
-
     def set_transfer_length(self, length):
         self.data_len = length
         self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = length
@@ -114,6 +106,9 @@ class ControlBlock:
 
     def set_next_cb(self, next_cb_addr):
         self.shared_mem[self.word_offset + self.CB_NEXT] = next_cb_addr
+
+    def write_word_to_source_data(self, offset, word):
+        self.shared_mem[self.word_offset + int(self.DATA_OFFSET / 4) + offset] = word
 
 
 def activate_channel_with_cb(channel, cb_addr, do_start=True):
