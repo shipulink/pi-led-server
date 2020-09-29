@@ -73,13 +73,13 @@ CB_PAUSE = dma.ControlBlock()  # Resets CB_IDLE_CLR's NEXT_CB_ADDR to get into t
 # Configure idle loop
 CB_IDLE_WAIT.set_transfer_information(DMA_FLAGS_PWM)
 CB_IDLE_WAIT.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
-CB_IDLE_WAIT.set_next_cb(CB_IDLE_CLR.addr)
+CB_IDLE_WAIT.set_next_cb_addr(CB_IDLE_CLR.addr)
 
 CB_IDLE_CLR.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_IDLE_CLR.set_transfer_length(8)
 CB_IDLE_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_IDLE_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPCLR0)
-CB_IDLE_CLR.set_next_cb(CB_IDLE_WAIT.addr)
+CB_IDLE_CLR.set_next_cb_addr(CB_IDLE_WAIT.addr)
 
 # Configure data loop
 cb_data_advance_src_addr = CB_DATA_ADVANCE.addr + 0x4
@@ -90,29 +90,29 @@ CB_DATA_ADVANCE.set_source_addr(dma_data.start_address)
 CB_DATA_ADVANCE.set_destination_addr(cb_data_advance_src_addr)
 CB_DATA_ADVANCE.set_transfer_length_stride(4, 3)
 CB_DATA_ADVANCE.set_stride(src_stride, dest_stride)
-CB_DATA_ADVANCE.set_next_cb(CB_DATA_UPD.addr)
+CB_DATA_ADVANCE.set_next_cb_addr(CB_DATA_UPD.addr)
 
 CB_DATA_UPD.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_UPD.set_transfer_length(8)
 CB_DATA_UPD.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # overwrite MS_MBOX_3,4 with GPIO CLR data
-CB_DATA_UPD.set_next_cb(CB_DATA_SET_CLR.addr)
+CB_DATA_UPD.set_next_cb_addr(CB_DATA_SET_CLR.addr)
 
 CB_DATA_SET_CLR.set_transfer_information(
     dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_DEST_INC | dma.DMA_TI_SRC_INC | DMA_WAITS)
 CB_DATA_SET_CLR.set_transfer_length(20)
 CB_DATA_SET_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_SET_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPSET0)
-CB_DATA_SET_CLR.set_next_cb(CB_DATA_WAIT1.addr)
+CB_DATA_SET_CLR.set_next_cb_addr(CB_DATA_WAIT1.addr)
 
 CB_DATA_WAIT1.set_transfer_information(DMA_FLAGS_PWM)
 CB_DATA_WAIT1.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
-CB_DATA_WAIT1.set_next_cb(CB_DATA_CLR.addr)
+CB_DATA_WAIT1.set_next_cb_addr(CB_DATA_CLR.addr)
 
 CB_DATA_CLR.set_transfer_information(dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_CLR.set_transfer_length(8)
 CB_DATA_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPCLR0)
-CB_DATA_CLR.set_next_cb(CB_DATA_WAIT2.addr)
+CB_DATA_CLR.set_next_cb_addr(CB_DATA_WAIT2.addr)
 
 CB_DATA_WAIT2.set_transfer_information(DMA_FLAGS_PWM)
 CB_DATA_WAIT2.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
@@ -120,7 +120,7 @@ CB_DATA_WAIT2.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
 CB_PAUSE.set_transfer_length(4)
 CB_PAUSE.write_word_to_source_data(0, CB_IDLE_WAIT.addr)
 CB_PAUSE.set_destination_addr(CB_IDLE_CLR.addr + 0x14)
-CB_PAUSE.set_next_cb(CB_IDLE_CLR.addr)
+CB_PAUSE.set_next_cb_addr(CB_IDLE_CLR.addr)
 
 dma_data.set_cb_addrs(CB_DATA_ADVANCE.addr, CB_PAUSE.addr)
 
@@ -134,7 +134,7 @@ dma.activate_channel_with_cb(DMA_CH, CB_IDLE_WAIT.addr)
 
 start = time.time()
 while time.time() - start < PLAY_SECONDS:
-    CB_IDLE_CLR.set_next_cb(CB_DATA_ADVANCE.addr)
+    CB_IDLE_CLR.set_next_cb_addr(CB_DATA_ADVANCE.addr)
     time.sleep(.01)
 
 pwm.stop_pwm(DMA_CH, PWM_CLK_SRC)

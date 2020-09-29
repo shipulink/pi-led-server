@@ -72,27 +72,24 @@ class ControlBlock:
 
         self.addr = mv_phys_addr + self.word_offset * 4
         self.data_addr = self.addr + self.DATA_OFFSET
-        self.data_len = 4
         self.shared_mem[self.word_offset + self.CB_SRC_ADDR] = self.data_addr
-        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = self.data_len
+        self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = 4
 
     def set_transfer_information(self, transfer_information):
         self.shared_mem[self.word_offset + self.CB_TI] = transfer_information
 
-    def set_destination_addr(self, dest_addr):
-        self.shared_mem[self.word_offset + self.CB_DEST_ADDR] = dest_addr
-
     def set_source_addr(self, src_addr):
         self.shared_mem[self.word_offset + self.CB_SRC_ADDR] = src_addr
 
+    def set_destination_addr(self, dest_addr):
+        self.shared_mem[self.word_offset + self.CB_DEST_ADDR] = dest_addr
+
     def set_transfer_length(self, length):
-        self.data_len = length
         self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = length
 
     # x = transfer length in bytes
     # y = number of transfers
     def set_transfer_length_stride(self, x, y):
-        self.data_len = x * y
         self.shared_mem[self.word_offset + self.CB_TXFR_LEN] = x | (y - 1) << 16
 
     def set_stride(self, src, dest):
@@ -104,7 +101,7 @@ class ControlBlock:
 
         self.shared_mem[self.word_offset + self.CB_STRIDE] = src | dest << 16
 
-    def set_next_cb(self, next_cb_addr):
+    def set_next_cb_addr(self, next_cb_addr):
         self.shared_mem[self.word_offset + self.CB_NEXT] = next_cb_addr
 
     def write_word_to_source_data(self, offset, word):
