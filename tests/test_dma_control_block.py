@@ -48,7 +48,8 @@ class TestMemoryUtils(unittest.TestCase):
     def test_constructor_sets_src_addr_to_an_address_in_shared_memory_of_cb(self):
         cb_word_offset = 16
         dma.ControlBlock(self.mv, cb_word_offset)
-        expected_src_addr = mu.get_mem_view_phys_addr_info(self.mv[cb_word_offset + self.OFFSET_WORDS_DATA_DEFAULT:]).p_addr
+        expected_src_addr = mu.get_mem_view_phys_addr_info(
+            self.mv[cb_word_offset + self.OFFSET_WORDS_DATA_DEFAULT:]).p_addr
         self.assertEqual(expected_src_addr, self.mv[cb_word_offset + self.OFFSET_WORDS_SRC_ADDR])
 
     def test_set_transfer_information(self):
