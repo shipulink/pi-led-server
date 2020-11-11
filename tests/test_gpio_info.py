@@ -5,9 +5,6 @@ import app.gpio as gpio
 
 class TestMemoryUtils(unittest.TestCase):
 
-    def setUp(self):
-        return
-
     def test_constructor_rejects_invalid_pin_numbers(self):
         self.assertRaises(Exception, gpio.GpioInfo, -1)
         self.assertRaises(Exception, gpio.GpioInfo, 54)
@@ -38,7 +35,7 @@ class TestMemoryUtils(unittest.TestCase):
         self.assertEquals(20, gpio.GpioInfo(50).gp_fsel_reg_offset)
         self.assertEquals(20, gpio.GpioInfo(53).gp_fsel_reg_offset)
 
-    def test_constructor_calculates_correct_fsel_pin_bit_offset(self):
+    def test_constructor_calculates_correct_fsel_pin_bit_shift(self):
         self.assertEquals(0, gpio.GpioInfo(0).gp_fsel_bit_offset)
         self.assertEquals(15, gpio.GpioInfo(5).gp_fsel_bit_offset)
         self.assertEquals(0, gpio.GpioInfo(10).gp_fsel_bit_offset)
