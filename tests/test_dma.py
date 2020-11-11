@@ -72,7 +72,7 @@ class TestMemoryUtils(unittest.TestCase):
             channel_offset = 0x100 * channel
             cb_addr_register_offset = channel_offset + dma.DMA_CB_AD
             cb_addr_register = struct.unpack('<L', m[cb_addr_register_offset:cb_addr_register_offset + 4])[0]
-            self.assertEquals(self.cb.addr, cb_addr_register)
+            self.assertEqual(self.cb.addr, cb_addr_register)
 
 
 def is_nth_bit_set(word, n):
