@@ -109,9 +109,9 @@ class TestMemoryUtils(unittest.TestCase):
         cb_word_offset = 16
         target = dma.ControlBlock(self.mv, cb_word_offset)
         word = random.randint(0, 0xFFFFFFFF)
-        write_offset = 3
-        target.write_word_to_source_data(write_offset, word)
-        self.assertEqual(word, self.mv[cb_word_offset + write_offset + self.OFFSET_WORDS_DATA_DEFAULT])
+        write_offset_bytes = 3
+        target.write_word_to_source_data(write_offset_bytes, word)
+        self.assertEqual(word, self.mv[cb_word_offset + int(write_offset_bytes / 4) + self.OFFSET_WORDS_DATA_DEFAULT])
 
 
 if __name__ == '__main__':
