@@ -26,7 +26,6 @@ class TestMemoryUtils(unittest.TestCase):
             self.assertFalse(is_nth_bit_set(cs_register, 0))  # Not active
             self.assertFalse(is_nth_bit_set(cs_register, 1))  # No control block has been completed
             self.assertFalse(is_nth_bit_set(cs_register, 2))  # Channel has not produced an interrupt
-            self.assertFalse(is_nth_bit_set(cs_register, 3))  # No current data request (DREQ)
             self.assertFalse(is_nth_bit_set(cs_register, 4))  # Not paused, because it hasn't started yet
             self.assertFalse(is_nth_bit_set(cs_register, 5))  # Not paused by DREQ
             self.assertFalse(is_nth_bit_set(cs_register, 6))  # Not waiting for any writes to complete
