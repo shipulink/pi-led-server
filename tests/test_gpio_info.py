@@ -36,10 +36,10 @@ class TestMemoryUtils(unittest.TestCase):
         self.assertEqual(20, gpio.GpioInfo(53).gp_fsel_reg_offset)
 
     def test_constructor_calculates_correct_fsel_pin_bit_shift(self):
-        self.assertEqual(0, gpio.GpioInfo(0).gp_fsel_bit_offset)
-        self.assertEqual(15, gpio.GpioInfo(5).gp_fsel_bit_offset)
-        self.assertEqual(0, gpio.GpioInfo(10).gp_fsel_bit_offset)
-        self.assertEqual(21, gpio.GpioInfo(17).gp_fsel_bit_offset)
+        self.assertEqual(0, gpio.GpioInfo(0).gp_fsel_bit_shift)
+        self.assertEqual(15, gpio.GpioInfo(5).gp_fsel_bit_shift)
+        self.assertEqual(0, gpio.GpioInfo(10).gp_fsel_bit_shift)
+        self.assertEqual(21, gpio.GpioInfo(17).gp_fsel_bit_shift)
 
 
 if __name__ == '__main__':

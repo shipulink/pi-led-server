@@ -128,8 +128,7 @@ dma_data.set_cb_addrs(CB_DATA_ADVANCE.addr, CB_PAUSE.addr)
 # Start DMA #
 #############
 pwm.configure_and_start_pwm(DMA_CH, PWM_CLK_SRC, PWM_CLK_DIV_INT, PWM_CLK_DIV_FRAC, PWM_CYCLES)
-gpio.set_pin_fnc_to_output(GPIO_INFO_PIN15)
-gpio.set_pin_fnc_to_output(GPIO_INFO_PIN18)
+gpio.set_pins_to_output([GPIO_INFO_PIN15, GPIO_INFO_PIN18])
 dma.activate_channel_with_cb(DMA_CH, CB_IDLE_WAIT.addr)
 
 start = time.time()

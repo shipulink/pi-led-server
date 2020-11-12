@@ -34,11 +34,20 @@ class GpioInfo:
 
         gp_f_sel_ind = int(pin / 10)
         self.gp_fsel_reg_offset = self.GPFSEL_REG_OFFSETS[gp_f_sel_ind]
-        self.gp_fsel_bit_offset = (pin % 10) * 3
+        self.gp_fsel_bit_shift = (pin % 10) * 3
 
 
-def set_pin_fnc_to_output(gp_info):
+def set_pins_to_output(gpio_info_list):
+    reg_offset_to_value_map = {}
+    for gpio_info in gpio_info_list:
+        reg_offset = gpio_info.gp_fsel_reg_offset
+        current_value = reg_offset_to_value_map.get(reg_offset, 0)
+        new_value = current_value | 1 << gpio_info.gp_fsel_bit_shift
+        reg_offset_to_value_map[reg_offset] = new_value
+
     with mu.mmap_dev_mem(GPIO_BASE_PHYS) as m:
-        mu.write_word_to_byte_array(m, gp_info.gp_fsel_reg_offset, 1 << gp_info.gp_fsel_bit_offset)
+        for reg_offset in reg_offset_to_value_map.keys():
+            value = reg_offset_to_value_map[reg_offset]
+            mu.write_word_to_byte_array(m, reg_offset, value)
 
     time.sleep(0.1)
