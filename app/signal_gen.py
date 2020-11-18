@@ -37,7 +37,7 @@ byte_arr2 = array.array("B", [
     # 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 ])
 num_leds = int(len(byte_arr1) / 3)
-dma_data = fd.LedDmaFrameData2(num_leds)
+dma_data = fd.LedDmaFrameData(num_leds)
 dma_data.populate_with_data(byte_arr1, GPIO_INFO_PIN15)
 dma_data.populate_with_data(byte_arr2, GPIO_INFO_PIN18)
 

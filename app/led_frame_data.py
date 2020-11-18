@@ -1,7 +1,7 @@
 import app.memory_utils as mu
 
 
-class LedDmaFrameData2:
+class LedDmaFrameData:
     def __init__(self, num_leds):
         self.data_cb_addr = None
         self.stop_cb_addr = None
@@ -17,7 +17,7 @@ class LedDmaFrameData2:
         self.start_address = mu.get_mem_view_phys_addr_info(self.bits[0]).p_addr
 
         # Fill the first slot of every 3-int array with the address of the next 3-int array.
-        # Fill the second slot of every 3-int array with the address of the bit's gpio_data slot's address
+        # Fill the last slot of every 3-int array with the address of the bit's gpio_data slot's address
         i = 0
         while i < self.num_bits:
             if i < self.num_bits - 1:
@@ -26,7 +26,7 @@ class LedDmaFrameData2:
             i += 1
 
         # Set the first slot of the last 3-int array to the address of the first one,
-        # completing the self-advancing loop
+        # resetting the DMA CB loop to the first bit of the next frame
         self.bits[self.num_bits - 1][0] = mu.get_mem_view_phys_addr_info(self.bits[0]).p_addr
 
     def set_cb_addrs(self, data_cb_addr, stop_cb_addr):
