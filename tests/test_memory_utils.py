@@ -1,5 +1,6 @@
 import array
 import ctypes
+import mmap
 import unittest
 
 import app.memory_utils as mu
@@ -33,7 +34,6 @@ class TestMemoryUtils(unittest.TestCase):
         self.assertEqual(p_addr_info_expected.offset, p_addr_info.offset)
         self.assertEqual(p_addr_info_expected.p_addr, p_addr_info.p_addr)
 
-
     def test_write_word_to_byte_array(self):
         word = 0xa0b00c0d
         byte_arr = bytearray(4)
@@ -43,6 +43,15 @@ class TestMemoryUtils(unittest.TestCase):
         self.assertEqual(byte_arr[1], 0x0c)
         self.assertEqual(byte_arr[2], 0xb0)
         self.assertEqual(byte_arr[3], 0xa0)
+
+    def test_check_int_mem_view_physical_contiguous(self):
+        # Make a memoryview of a single byte, so that it must be contiguous
+        mv_contiguous = memoryview(array.array('L', [0] * 1))
+        self.assertTrue(mu.check_int_mem_view_physical_contiguous(mv_contiguous))
+
+        # Make a memoryview larger than system page size, so that it cannot be contiguous
+        mv_non_contiguous = memoryview(array.array('L', [0] * mmap.PAGESIZE * 2))
+        self.assertFalse(mu.check_int_mem_view_physical_contiguous(mv_non_contiguous))
 
 
 if __name__ == '__main__':
