@@ -1,40 +1,38 @@
+import array
 import ctypes
 import unittest
-
-import mmap
 
 import app.memory_utils as mu
 
 
 class TestMemoryUtils(unittest.TestCase):
 
-    # TODO: Test more sizes and alignments (see if there's a Spock-like "where" clause)
-    def test_alloc_aligned(self):
-        size = 32
-        alignment = 32
+    def test_virtual_to_physical_addr(self):
+        initial_value = 0
+        dummy_item = ctypes.c_int(initial_value)
+        virtual_address = ctypes.addressof(dummy_item)
+        p_addr_info = mu.virtual_to_physical_addr(virtual_address)
+        self.assertEqual(p_addr_info.frame_start + p_addr_info.offset, p_addr_info.p_addr)
+        self.assertEqual(initial_value, dummy_item.value)
 
-        m = mu.ctypes_alloc_aligned(size, alignment)
-        m_addr = ctypes.addressof(m)
+        new_value = 123
+        with mu.mmap_dev_mem(p_addr_info.frame_start) as m:
+            m[p_addr_info.offset] = new_value
+        self.assertEqual(new_value, dummy_item.value)
 
-        self.assertEqual(len(m), size)
-        self.assertEqual(m_addr % alignment, 0)
+    def test_get_mem_view_phys_addr_info(self):
+        view_len = 10
+        mv = memoryview(array.array('L', [0] * view_len))
+        c_type_mv = ctypes.c_char.from_buffer(mv)
+        v_addr = ctypes.addressof(c_type_mv)
+        p_addr_info_expected = mu.virtual_to_physical_addr(v_addr)
 
-    # TODO: See if there's a way to make this function fail (like referring to
-    # a variable in swap space)
-    def test_virtual_to_physical(self):
-        phrase = b"Helloooo world!"
-        m = mu.ctypes_alloc_aligned(16, 32)
-        m[0:15] = phrase
-        v_addr = ctypes.addressof(m)
-        addr_info = mu.virtual_to_physical_addr(v_addr)
+        p_addr_info = mu.get_mem_view_phys_addr_info(mv)
 
-        self.assertEqual(addr_info.p_addr, addr_info.frame_start + addr_info.offset)
+        self.assertEqual(p_addr_info_expected.frame_start, p_addr_info.frame_start)
+        self.assertEqual(p_addr_info_expected.offset, p_addr_info.offset)
+        self.assertEqual(p_addr_info_expected.p_addr, p_addr_info.p_addr)
 
-        with open("/dev/mem", "r+b", buffering=0) as f:
-            with mmap.mmap(f.fileno(), 4096, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
-                           offset=addr_info.frame_start) as m:
-                s = addr_info.offset
-                self.assertEqual(m[s:s + 15], phrase)
 
     def test_write_word_to_byte_array(self):
         word = 0xa0b00c0d

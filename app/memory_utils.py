@@ -44,28 +44,6 @@ def get_mem_view_phys_addr_info(mem_view):
     return virtual_to_physical_addr(ctypes.addressof(ctypes.c_char.from_buffer(mem_view)))
 
 
-# size and alignment are in bytes
-def ctypes_alloc_aligned(size, alignment):
-    # Account for a potential shift of up to (alignment-1)
-    buf_size = size + alignment - 1
-    # Allocate the memory as a Python byte array
-    raw_memory = bytearray(buf_size + 1)
-
-    # c_char is exactly one byte. In Python, multiplying a type T by N creates a new type that is an Array of N Ts.
-    ctypes_raw_type = ctypes.c_char * buf_size
-    # Instantiate my Array<c_char> that sits in raw_memory.
-    # This is only in order to get the address of raw_memory via ctypes.
-    ctypes_raw_memory = ctypes_raw_type.from_buffer(raw_memory)
-
-    raw_address = ctypes.addressof(ctypes_raw_memory)
-    offset = alignment - raw_address % alignment
-
-    ctypes_aligned_type = ctypes.c_char * size
-    ctypes_aligned_memory = ctypes_aligned_type.from_buffer(raw_memory, offset)
-
-    return ctypes_aligned_memory
-
-
 def write_word_to_byte_array(byte_array, address, word):
     byte_array[address: address + 4] = word.to_bytes(4, byteorder='little')
     return
