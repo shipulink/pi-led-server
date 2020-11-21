@@ -53,6 +53,27 @@ class TestMemoryUtils(unittest.TestCase):
         mv_non_contiguous = memoryview(array.array('L', [0] * mmap.PAGESIZE * 2))
         self.assertFalse(mu.check_int_mem_view_physical_contiguous(mv_non_contiguous))
 
+    def test_create_phys_contig_int_view_succeeds_for_small_lengths(self):
+        mv = mu.create_phys_contig_int_view(1)
+        self.assertTrue(isinstance(mv, memoryview))
+        self.assertEqual(1, len(mv))
+        self.assertTrue(isinstance(mv[0], int))
+
+    def test_create_phys_contig_int_view_raises_exception_for_large_lengths(self):
+        self.assertRaises(Exception, mu.create_phys_contig_int_view, mmap.PAGESIZE * 2)
+
+    def test_create_phys_contig_int_views(self):
+        view_len = 3
+        num_views = 2
+        mv_array = mu.create_phys_contig_int_views(view_len, num_views)
+        self.assertEqual(num_views, len(mv_array))
+        self.assertEqual(view_len, len(mv_array[0]))
+        self.assertEqual(view_len, len(mv_array[1]))
+        self.assertTrue(isinstance(mv_array[0], memoryview))
+        self.assertTrue(isinstance(mv_array[1], memoryview))
+        self.assertTrue(isinstance(mv_array[0][0], int))
+        self.assertTrue(isinstance(mv_array[1][0], int))
+
 
 if __name__ == '__main__':
     unittest.main()

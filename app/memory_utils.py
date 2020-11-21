@@ -4,7 +4,6 @@ import mmap
 
 import os
 import random
-import struct
 
 # MMAP constants:
 MAP_NO_RESERVE = 0x4000
@@ -96,14 +95,6 @@ def create_phys_contig_int_views(view_len, num_views):
     while len(mvs) < num_views:
         mvs.append(create_phys_contig_int_view(view_len))
     return mvs
-
-
-def convert_byte_array_to_hex_words_string(byte_arr, num_words, byte_offset):
-    ints = []
-    for i in range(num_words):
-        start = byte_offset + i * 4
-        ints.append(struct.unpack("<L", byte_arr[start: start + 4]))
-    return str(':'.join(format(x[0], '08x') for x in ints))
 
 
 def mmap_dev_mem(addr):
