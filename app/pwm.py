@@ -56,6 +56,9 @@ def configure_and_start_pwm(dma_ch, pwm_clk_src, pwm_clk_div_int, pwm_clk_div_fr
     if pwm_clk_div_int < 2:
         raise Exception("Clock integer divider must be 2 or greater.")
 
+    if pwm_clk_div_frac < 0 or pwm_clk_div_frac > 4095:
+        raise Exception("Clock fractional divider must be between 0 (inclusive) and 4095 (inclusive).")
+
     pwm_period_ns = 1000000000 / CLK_SRC_RATES[pwm_clk_src] * ((pwm_clk_div_int + pwm_clk_div_frac / 4096) * pwm_cycles)
     print("Starting PWM with a period of " + str(pwm_period_ns) + " ns.")
 
