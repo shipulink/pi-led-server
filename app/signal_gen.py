@@ -63,10 +63,10 @@ CB_IDLE_CLR = dma.ControlBlock()
 CB_DATA_ADVANCE = dma.ControlBlock(shared_mem, 0)  # Advances its own SRC_ADDR and CB_DATA_UPD's SRC_ADDR
 CB_DATA_UPD = dma.ControlBlock(shared_mem, 24)  # Writes the next bit to be copied to GPIO into MS_MBOX
 
-CB_DATA_SET_CLR = dma.ControlBlock()
 CB_DATA_WAIT1 = dma.ControlBlock()
-CB_DATA_CLR = dma.ControlBlock()
-CB_DATA_WAIT2 = dma.ControlBlock(shared_mem, 8)  # Waits and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
+CB_DATA_SET_CLR = dma.ControlBlock()
+CB_DATA_WAIT2 = dma.ControlBlock()
+CB_DATA_CLR = dma.ControlBlock(shared_mem, 8)  # Clears GPIO pins and either goes to CB_DATA_ADVANCE or CB_DATA_PAUSE
 
 CB_PAUSE = dma.ControlBlock()  # Resets CB_IDLE_CLR's NEXT_CB_ADDR to get into the idle CB loop
 
@@ -95,27 +95,27 @@ CB_DATA_ADVANCE.set_next_cb_addr(CB_DATA_UPD.addr)
 CB_DATA_UPD.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_UPD.set_transfer_length(8)
 CB_DATA_UPD.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # overwrite MS_MBOX_3,4 with GPIO CLR data
-CB_DATA_UPD.set_next_cb_addr(CB_DATA_SET_CLR.addr)
+CB_DATA_UPD.set_next_cb_addr(CB_DATA_WAIT1.addr)
+
+CB_DATA_WAIT1.set_transfer_information(DMA_FLAGS_PWM)
+CB_DATA_WAIT1.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
+CB_DATA_WAIT1.set_next_cb_addr(CB_DATA_SET_CLR.addr)
 
 CB_DATA_SET_CLR.set_transfer_information(
     dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_DEST_INC | dma.DMA_TI_SRC_INC | DMA_WAITS)
 CB_DATA_SET_CLR.set_transfer_length(20)
 CB_DATA_SET_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_SET_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPSET0)
-CB_DATA_SET_CLR.set_next_cb_addr(CB_DATA_WAIT1.addr)
+CB_DATA_SET_CLR.set_next_cb_addr(CB_DATA_WAIT2.addr)
 
-CB_DATA_WAIT1.set_transfer_information(DMA_FLAGS_PWM)
-CB_DATA_WAIT1.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
-CB_DATA_WAIT1.set_next_cb_addr(CB_DATA_CLR.addr)
+CB_DATA_WAIT2.set_transfer_information(DMA_FLAGS_PWM)
+CB_DATA_WAIT2.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
+CB_DATA_WAIT2.set_next_cb_addr(CB_DATA_CLR.addr)
 
 CB_DATA_CLR.set_transfer_information(dma.DMA_TI_NO_WIDE_BURSTS | dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
 CB_DATA_CLR.set_transfer_length(8)
 CB_DATA_CLR.set_source_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET)
 CB_DATA_CLR.set_destination_addr(gpio.GPIO_BASE_BUS + gpio.GPCLR0)
-CB_DATA_CLR.set_next_cb_addr(CB_DATA_WAIT2.addr)
-
-CB_DATA_WAIT2.set_transfer_information(DMA_FLAGS_PWM)
-CB_DATA_WAIT2.set_destination_addr(pwm.PWM_BASE_BUS + pwm.PWM_FIFO)
 
 CB_PAUSE.set_transfer_length(4)
 CB_PAUSE.write_word_to_source_data(0, CB_IDLE_WAIT.addr)
