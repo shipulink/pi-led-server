@@ -41,12 +41,13 @@ dma_data = fd.LedDmaFrameData(num_leds)
 dma_data.populate_with_data(byte_arr1, GPIO_INFO_PIN15)
 dma_data.populate_with_data(byte_arr2, GPIO_INFO_PIN18)
 
-# SET and CLR registers are spaced as follows, spanning 4 registers:
-# SET -   -   CLR
-# 1C  20  24  28
-# MS_MBOX_0 - MS_MBOX_7 are peripheral registers usable for storing this data. We will only need MS_MBOX_0 - MS_MBOX_3.
-# The first register will be used to always set / clear gpio pins, so the appropriate bits in MS_MBOX_0 should just
-# statically be set. The fourth register will be used to optionally clear gpio pins to create a "zero" square wave.
+# SET and CLR registers are spaced as follows, spanning 5 registers:
+# SET  SET  --   CLR  CLR
+# 1C   20   24   28   2C
+# MS_MBOX_0 - MS_MBOX_7 are peripheral registers usable for storing this data. We will only need MS_MBOX_0 - MS_MBOX_4.
+# The first two registers will be used to always set / clear gpio pins, so the appropriate bits in MS_MBOX_0 and
+# MS_MBOX_1 should just statically be set for this purpose. MS_MBOX_3 and MS_MBOX_4 will be used for optionally
+# clearing the GPIO pins.
 
 with mu.mmap_dev_mem(MS_BASE) as m:
     mu.write_word_to_byte_array(
