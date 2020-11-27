@@ -1,6 +1,17 @@
 import app.memory_utils as mu
 
 
+def flatten_array_of_byte_arrays(data):
+    i = 0
+    flat_data = bytearray(len(data) * 3)
+    while i < len(data):
+        flat_data[i * 3] = data[i][1]
+        flat_data[i * 3 + 1] = data[i][0]
+        flat_data[i * 3 + 2] = data[i][2]
+        i += 1
+    return flat_data
+
+
 class LedDmaFrameData:
     def __init__(self, num_leds):
         self.data_cb_addr = None
@@ -43,15 +54,18 @@ class LedDmaFrameData:
             i += 1
         self.bits[self.num_bits - 1][1] = self.stop_cb_addr
 
+    # data is an array of bytearrays of size 3, representing the RGB value of each LED
     def populate_with_data(self, data, gpio_info):
+        # TODO: Refactor so that no flattening is required (convert directly from array of bytearrays)
+        flat_data = flatten_array_of_byte_arrays(data)
         num_bytes = self.num_leds * 3
-        if len(data) != num_bytes:
+        if len(flat_data) != num_bytes:
             raise Exception("This LedFrameData instance was initialized for exactly {} bytes of data. "
                             "The supplied data must be {} bytes long.".format(num_bytes, num_bytes))
 
         i = 0
         while i < num_bytes:
-            byte = data[i]
+            byte = flat_data[i]
             j = 0
             while j < 8:
                 bit_ind = 8 * i + j
@@ -59,3 +73,16 @@ class LedDmaFrameData:
                     self.gpio_data[bit_ind][gpio_info.set_clr_register_index] |= 1 << gpio_info.pin_flip_bit_shift
                 j += 1
             i += 1
+
+        # TODO: For some reason printing this after setting the data makes the flickering go away entirely.
+        #  It is possible that by reading from the memory blocks, I'm forcing python to finish
+        #  otherwise-lazy writes
+        #  Maybe the above function should use mmap to write the data, or should build in the reading
+        data_strings = []
+        for gpio_datum in self.gpio_data:
+            data_strings.append(':'.join(format(x, '08x') for x in gpio_datum))
+
+    def clear_data(self):
+        for gpio_datum in self.gpio_data:
+            gpio_datum[0] = 0
+            gpio_datum[1] = 0
