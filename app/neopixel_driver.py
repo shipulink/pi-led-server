@@ -121,17 +121,5 @@ class NeopixelDriver:
         pwm.stop_pwm(DMA_CH, PWM_CLK_SRC)
 
     def send_frame(self, frame):
-        # TODO: move most of this to LedDmaFrameData
-        if len(frame) != len(self.gpio_pins):
-            raise Exception("Length of frame info must match the number of gpio pins in use.")
-
-        self.dma_data.clear_data()
-
-        i = 0
-        while i < len(self.gpio_pins):
-            frame_for_one_strip = frame[i]
-            gpio_info = self.gpio_pins[i]
-            self.dma_data.populate_with_data(frame_for_one_strip, gpio_info)
-            i += 1
-
+        self.dma_data.populate_with_data(frame, self.gpio_pins)
         self.cb_idle_clr.set_next_cb_addr(self.cb_data_advance.addr)
