@@ -36,7 +36,7 @@ class NeopixelDriver:
         with mu.mmap_dev_mem(MS_BASE) as m:
             mu.write_word_to_byte_array(
                 m, MS_MBOX_REG_OFFSET + GPIO_INFO_PIN18.set_clr_register_index,
-                   1 << GPIO_INFO_PIN18.pin_flip_bit_shift | 1 << GPIO_INFO_PIN15.pin_flip_bit_shift)
+                1 << GPIO_INFO_PIN18.pin_flip_bit_shift | 1 << GPIO_INFO_PIN15.pin_flip_bit_shift)
 
         # Allocate enough memory for all the CBs.
         self.shared_mem = mu.create_aligned_phys_contig_int_view(32, 32)
@@ -45,13 +45,13 @@ class NeopixelDriver:
         self.cb_idle_wait = dma.ControlBlock()
         self.cb_idle_clr = dma.ControlBlock()
 
-        self.cb_data_advance = dma.ControlBlock(self.shared_mem, 0)  # Advances its own SRC_ADDR and cb_data_upd's SRC_ADDR
-        self.cb_data_upd = dma.ControlBlock(self.shared_mem, 24)  # Writes the next bit to be copied to GPIO into MS_MBOX
+        self.cb_data_advance = dma.ControlBlock(self.shared_mem, 0)  # Advances own SRC_ADDR and cb_data_upd's SRC_ADDR
+        self.cb_data_upd = dma.ControlBlock(self.shared_mem, 24)  # Writes next bit to be copied to GPIO into MS_MBOX
 
         self.cb_data_wait1 = dma.ControlBlock()
         self.cb_data_set_clr = dma.ControlBlock()
         self.cb_data_wait2 = dma.ControlBlock()
-        self.cb_data_clr = dma.ControlBlock(self.shared_mem, 8)  # Clears GPIO pins and goes to cb_data_advance or CB_PAUSE
+        self.cb_data_clr = dma.ControlBlock(self.shared_mem, 8)  # Clears GPIO pins. Goes to cb_data_advance or cb_pause
 
         self.cb_pause = dma.ControlBlock()  # Resets cb_idle_clr's NEXT_CB_ADDR to get into the idle CB loop
 
@@ -77,9 +77,10 @@ class NeopixelDriver:
         self.cb_data_advance.set_stride(src_stride, dest_stride)
         self.cb_data_advance.set_next_cb_addr(self.cb_data_upd.addr)
 
+        # writes GPIO CLR data to MS_MBOX_3,4
         self.cb_data_upd.set_transfer_information(dma.DMA_TI_SRC_INC | dma.DMA_TI_DEST_INC)
         self.cb_data_upd.set_transfer_length(8)
-        self.cb_data_upd.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)  # writes GPIO CLR data to MS_MBOX_3,4
+        self.cb_data_upd.set_destination_addr(MS_BASE_BUS + MS_MBOX_REG_OFFSET + 12)
         self.cb_data_upd.set_next_cb_addr(self.cb_data_wait1.addr)
 
         self.cb_data_wait1.set_transfer_information(DMA_FLAGS_PWM)
