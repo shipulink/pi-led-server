@@ -1,3 +1,5 @@
+import os
+
 import app.memory_utils as mu
 
 
@@ -42,12 +44,13 @@ class LedDmaFrameData:
 
         # Fill the first slot of every 3-int array with the address of the next 3-int array.
         # Fill the last slot of every 3-int array with the address of the bit's gpio_data slot's address
-        i = 0
-        while i < self.num_bits:
-            if i < self.num_bits - 1:
-                self.bits[i][0] = mu.get_mem_view_phys_addr_info(self.bits[i + 1]).p_addr
-            self.bits[i][2] = mu.get_mem_view_phys_addr_info(self.gpio_data[i]).p_addr
-            i += 1
+        with open("/proc/" + str(os.getpid()) + "/pagemap", "r+b") as pagemap_fd:
+            i = 0
+            while i < self.num_bits:
+                if i < self.num_bits - 1:
+                    self.bits[i][0] = mu.get_mem_view_phys_addr_info_with_pagemap(self.bits[i + 1], pagemap_fd).p_addr
+                self.bits[i][2] = mu.get_mem_view_phys_addr_info_with_pagemap(self.gpio_data[i], pagemap_fd).p_addr
+                i += 1
 
         # Set the first slot of the last 3-int array to the address of the first one,
         # resetting the DMA CB loop to the first bit of the next frame
