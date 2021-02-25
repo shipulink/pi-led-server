@@ -1,9 +1,9 @@
 import array
 import ctypes
-import mmap
-
 import os
 import random
+
+import mmap
 
 # MMAP constants:
 MAP_NO_RESERVE = 0x4000
@@ -78,7 +78,17 @@ def create_aligned_phys_contig_int_view(view_len, byte_alignment):
     return mv[words_to_next_aligned_addr: padded_length - remaining_words]
 
 
+def create_int_view(view_len):
+    return memoryview(array.array('L', [0] * view_len))
+
+
 def create_phys_contig_int_view(view_len):
+    if view_len <= 256:
+        return create_int_view(view_len)
+
+    if view_len >= 4096:
+        raise Exception("Cannot create a memory view of length above 4096 that is contiguous in physical memory.")
+
     fails = 0
     while fails < 5:
         mv = memoryview(array.array('L', [0] * view_len))

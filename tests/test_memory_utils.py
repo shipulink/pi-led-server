@@ -1,7 +1,8 @@
 import array
 import ctypes
-import mmap
 import unittest
+
+import mmap
 
 import app.memory_utils as mu
 
@@ -52,6 +53,14 @@ class TestMemoryUtils(unittest.TestCase):
         # Make a memoryview larger than system page size, so that it cannot be contiguous
         mv_non_contiguous = memoryview(array.array('L', [0] * mmap.PAGESIZE * 2))
         self.assertFalse(mu.check_int_mem_view_physical_contiguous(mv_non_contiguous))
+
+    def test_create_int_view_is_contiguous_for_length_256(self):
+        mv = mu.create_int_view(256)
+        self.assertTrue(mu.check_int_mem_view_physical_contiguous(mv))
+
+    def test_create_int_view_is_not_contiguous_for_length_4096(self):
+        mv = mu.create_int_view(4096)
+        self.assertFalse(mu.check_int_mem_view_physical_contiguous(mv))
 
     def test_create_phys_contig_int_view_succeeds_for_small_lengths(self):
         mv = mu.create_phys_contig_int_view(1)
