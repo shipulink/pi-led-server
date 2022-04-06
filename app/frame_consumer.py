@@ -3,10 +3,10 @@ from queue import Queue
 from threading import Thread
 from threading import Timer
 
+from app.color_sweep import ColorSweep
 from app.frame_producer import FrameProducer
 from app.gpio import GpioInfo
 from app.neopixel_driver import NeopixelDriver
-from app.single_color import SingleColor
 
 
 # TODO: Change to accept different effects for each strip
@@ -52,9 +52,11 @@ def play_animation(
     thread_fill_buffer.join()
 
 
-# color_sweep_producer = ColorSweep(2)
-# play_animation(color_sweep_producer, 2, 220, [GpioInfo(18)], 5)
+color_sweep_producer = ColorSweep(2)
+play_animation(color_sweep_producer, 30, 220, [GpioInfo(18)], 5)
 
-# single_color_producer = SingleColor("ffff00")  # yellow
-single_color_producer = SingleColor("eb34d2")  # pink
-play_animation(single_color_producer, 2, 220, [GpioInfo(18)], 1)
+# single_color_producer = SingleColor("ffff00")    # yellow
+# single_color_producer = SingleColor("eb34d2")    # pink
+# single_color_producer = SingleColor("000000")    # black
+# single_color_producer = SingleColor("ffffff")    # white
+# play_animation(single_color_producer, 5, 4, [GpioInfo(18)], 2)

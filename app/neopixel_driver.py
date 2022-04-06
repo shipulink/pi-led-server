@@ -1,3 +1,5 @@
+import time
+
 import app.dma as dma
 import app.gpio as gpio
 import app.led_frame_data as fd
@@ -113,14 +115,18 @@ class NeopixelDriver:
         self.gpio_pins = gpio_pins
 
     def start(self):
-        pwm.configure_and_start_pwm(DMA_CH, PWM_CLK_SRC, PWM_CLK_DIV_INT, PWM_CLK_DIV_FRAC, PWM_CYCLES)
-        gpio.set_pins_to_output([GPIO_INFO_PIN15, GPIO_INFO_PIN18])
-        dma.activate_channel_with_cb(DMA_CH, self.cb_idle_wait.addr)
+        return
+        # pwm.configure_and_start_pwm(DMA_CH, PWM_CLK_SRC, PWM_CLK_DIV_INT, PWM_CLK_DIV_FRAC, PWM_CYCLES)
+        # gpio.set_pins_to_output([GPIO_INFO_PIN15, GPIO_INFO_PIN18])
+        # dma.activate_channel_with_cb(DMA_CH, self.cb_idle_wait.addr)
 
     @staticmethod
     def stop():
         pwm.stop_pwm(DMA_CH, PWM_CLK_SRC)
 
     def send_frame(self, frame):
+        t0 = int(time.time() * 1000)
         self.dma_data.populate_with_data(frame, self.gpio_pins)
-        self.cb_idle_clr.set_next_cb_addr(self.cb_data_advance.addr)
+        t1 = int(time.time() * 1000)
+        print("total:" + str(t1 - t0))
+        # self.cb_idle_clr.set_next_cb_addr(self.cb_data_advance.addr)
