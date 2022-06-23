@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "library.h"
+#include "frame_consumer.h"
 
 int main() {
     printf("Hello World!\n");

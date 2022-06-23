@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "library.h"
+#include "frame_consumer.h"
 
 void hello(void) {
     printf("I'm a library!\n");
