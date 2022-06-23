@@ -3,3 +3,5 @@
 .idea
 app/*.o
 app/*.so
+/c/_target/
+/venv/
