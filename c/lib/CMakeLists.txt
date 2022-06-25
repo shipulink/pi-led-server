@@ -1,2 +1,4 @@
-add_library(${CMAKE_PROJECT_NAME} SHARED frame_consumer.c frame_consumer.h)
+add_library(${CMAKE_PROJECT_NAME} SHARED driver.c driver.h)
 target_include_directories (${CMAKE_PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+file(GLOB LIB_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*")
+target_sources(${CMAKE_PROJECT_NAME} PUBLIC ${LIB_SRC_FILES})
